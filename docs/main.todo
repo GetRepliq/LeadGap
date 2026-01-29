@@ -1,0 +1,19 @@
+Data Ingestion and Collection:
+     ✔ Endpoint for Google Reviews collection and scraping @done(26-01-29 17:54)
+     ☐ Improve performance for Google Reviews Endpoint
+     ☐ Endpoint for Yelp Reviews API and Scraping
+     ☐ Experimental Reddit Scanner module for market gaps
+     ☐ Reviews Filtering system for only bad reviews/negative reviews
+     ☐ Temporary Market Research Cache Module for LLM prompting
+
+Data Preprocessing & NLP Signal Extraction:
+     ☐ Preprocess data for normalisation and removal of irrelevant information
+     ☐ Remove spams, duplicates, low-signal reviews
+     ☐ Pattern Grouping and Frequency Weighting for all collected reviews
+     ☐ Importance score rating and Intent scoring with language patterns
+     ☐ Use NLP or LLMs for Pain Point and market gap detection using language patterns
+
+Serviec Gap & Strategy Mapping:
+     ☐ Suppy-Demand Detection for currentlt faced pain points
+     ☐ Ranks processed service gaps based on opportunity size, urgency and conversion rates
+     ☐ Convert model outputs into recommendations and small set of high-confidence actions

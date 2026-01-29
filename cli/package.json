@@ -21,8 +21,10 @@
   },
   "homepage": "https://github.com/regional-specter/Harvey#readme",
   "dependencies": {
+    "dotenv": "^16.4.5",
     "ink": "^6.6.0",
     "ink-gradient": "^3.0.0",
+    "puppeteer": "^24.36.0",
     "react": "^19.2.3"
   },
   "devDependencies": {
