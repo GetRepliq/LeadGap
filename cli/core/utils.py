@@ -366,8 +366,8 @@ if __name__ == '__main__':
                 print(f"Stars: {review['stars']}")
                 print(f"Review: {review['text']}")
                 print("-" * 20)
-     
-          print(f"\n--- Successfully Scraped {len(scraped_data)} Total Reviews ---")
+
+        print(f"\n--- Successfully Scraped {len(scraped_data)} Total Reviews ---")
     else:
         print("\nNo reviews were scraped. This could be because no reviews were found,")
         print("or an error occurred.")
