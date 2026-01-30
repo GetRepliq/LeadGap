@@ -1,6 +1,6 @@
 Data Ingestion and Collection:
      ✔ Endpoint for Google Reviews collection and scraping @done(26-01-29 17:54)
-     ☐ Improve performance for Google Reviews Endpoint
+     ✔ Improve performance for Google Reviews Endpoint @done(26-01-30 18:31)
      ☐ Endpoint for Yelp Reviews API and Scraping
      ☐ Experimental Reddit Scanner module for market gaps
      ☐ Reviews Filtering system for only bad reviews/negative reviews
