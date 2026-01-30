@@ -5,6 +5,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url'; // Added for ESM __dirname equivalent
+import { analyzeReviews } from './core/agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,21 +134,20 @@ const App = () => {
 
 			pythonProcess.stderr.on('data', (data) => {
 				const message = data.toString();
-				setHistory(prev => [...prev, `Tanner AI: ${message}`]);
+				// Suppress Python script's stderr output from chat for a cleaner summary response
+				// setHistory(prev => [...prev, `Tanner AI: ${message}`]); 
 				stderrData += message;
 			});
 
-			pythonProcess.on('close', (code) => {
+			pythonProcess.on('close', async (code) => {
 				if (code === 0) {
 					try {
 						const reviews = JSON.parse(stdoutData);
-						let formattedReviews = `Tanner AI: Found ${reviews.length} reviews.\n`;
-						reviews.forEach((review: any, index: number) => {
-							formattedReviews += `\nReview ${index + 1} for ${review.business_name}:\n`;
-							formattedReviews += `Stars: ${review.stars}\n`;
-							formattedReviews += `Text: ${review.text}\n`;
-						});
-						setHistory(prev => [...prev, formattedReviews]);
+						setHistory(prev => [...prev, `Tanner AI: Found ${reviews.length} reviews. Now analyzing...`]);
+						
+						const analysis = await analyzeReviews(reviews);
+						setHistory(prev => [...prev, `Tanner AI:\n${analysis}`]);
+
 					} catch (e) {
 						setHistory(prev => [...prev, `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}`]);
 					}
