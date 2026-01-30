@@ -1,4 +1,3 @@
-
 import time
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -14,6 +13,7 @@ def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_busi
     Scrapes Google Maps reviews for multiple businesses from a search query using Selenium.
     This approach is more robust by iterating through businesses, extracting names first,
     and ensuring context for element selection.
+    IMPROVED: Now expands truncated reviews to get full text.
     """
     # --- Browser and Driver Setup ---
     chrome_options = Options()
@@ -232,6 +232,49 @@ def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_busi
                     print("Reached the end of reviews for this business or no new reviews loaded.")
                     break
             
+            # --- IMPROVED: Expand truncated reviews first ---
+            print("Expanding truncated reviews to get full text...")
+            more_button_selectors = [
+                "button.w8nwRe.kyuRq",  # Common "More" button class
+                "button[aria-label='See more']",
+                "button[jsaction*='review.expand']",
+                "button.fontBodySmall",
+                "button[class*='review'][class*='expand']"
+            ]
+            
+            # Find and click all "More" buttons
+            expanded_count = 0
+            for more_selector in more_button_selectors:
+                try:
+                    more_buttons = driver.find_elements(By.CSS_SELECTOR, more_selector)
+                    for button in more_buttons:
+                        try:
+                            # Check if button text indicates it's a "More" button
+                            button_text = button.text.lower()
+                            button_aria = button.get_attribute("aria-label")
+                            
+                            if "more" in button_text or (button_aria and "more" in button_aria.lower()):
+                                # Scroll button into view
+                                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
+                                time.sleep(0.3)
+                                
+                                # Try to click using JavaScript if regular click fails
+                                try:
+                                    button.click()
+                                except Exception:
+                                    driver.execute_script("arguments[0].click();", button)
+                                    
+                                expanded_count += 1
+                                time.sleep(0.2)  # Small delay between clicks
+                        except (StaleElementReferenceException, Exception):
+                            # Button might have disappeared or become stale, continue
+                            continue
+                except NoSuchElementException:
+                    continue
+            
+            print(f"Expanded {expanded_count} truncated reviews")
+            time.sleep(1)  # Wait for expansions to complete
+            
             # --- Extract review details ---
             print("Extracting review details...")
             
@@ -274,7 +317,8 @@ def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_busi
                         "stars": star_rating if star_rating else "No rating",
                         "text": review_text
                     })
-                    print(f"  Extracted review {len(all_reviews_data)}: {review_text[:50]}...")
+                    # Show more of the review text in the log to verify we got the full text
+                    print(f"  Extracted review {len(all_reviews_data)}: {review_text[:100]}...")
 
             # --- Navigate back to search results to process the next business ---
             print("Navigating back to search results to process next business...")
@@ -306,8 +350,6 @@ if __name__ == '__main__':
     scraped_data = scrape_all_business_reviews(search_query, max_businesses=3, reviews_per_business=10) 
     
     if scraped_data:
-        print(f"\n--- Successfully Scraped {len(scraped_data)} Total Reviews ---")
-        
         # Group reviews by business name for clearer output
         reviews_by_business = {}
         for review in scraped_data:
@@ -323,6 +365,8 @@ if __name__ == '__main__':
                 print(f"Stars: {review['stars']}")
                 print(f"Review: {review['text']}")
                 print("-" * 20)
+        
+        print(f"\n--- Successfully Scraped {len(scraped_data)} Total Reviews ---")
     else:
         print("\nNo reviews were scraped. This could be because no reviews were found,")
         print("or an error occurred.")
