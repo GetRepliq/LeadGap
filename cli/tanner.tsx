@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import Gradient from 'ink-gradient';
 import fs from 'fs';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url'; // Added for ESM __dirname equivalent
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const HEADER_ASCII = `
 ████████╗ █████╗ ███╗   ██╗███╗   ██╗███████╗██████╗ 
@@ -14,7 +20,6 @@ const HEADER_ASCII = `
 
 const Header = () => (
     <Box flexDirection="column" alignItems="flex-start" paddingBottom={1}>
-        {/* Use the Gradient component here */}
         <Gradient name="morning">
             <Text bold>
                 {HEADER_ASCII}
@@ -110,9 +115,57 @@ const App = () => {
 		}
 	}, [suggestionBoxVisible]);
 
+	const handleCommand = (command: string) => {
+		const extractorCommand = "extract reviews for ";
+		if (command.startsWith(extractorCommand)) {
+			const searchQuery = command.substring(extractorCommand.length);
+			setHistory(prev => [...prev, `> ${command}`, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
+			
+			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py'); // Adjusted path
+			const pythonProcess = spawn('python3', [pythonScriptPath, searchQuery]);
+
+			let stdoutData = '';
+			let stderrData = '';
+
+			pythonProcess.stdout.on('data', (data) => {
+				stdoutData += data.toString();
+			});
+
+			pythonProcess.stderr.on('data', (data) => {
+				const message = data.toString();
+				setHistory(prev => [...prev, `Tanner AI: ${message}`]);
+				stderrData += message;
+			});
+
+			pythonProcess.on('close', (code) => {
+				if (code === 0) {
+					try {
+						const reviews = JSON.parse(stdoutData);
+						let formattedReviews = `Tanner AI: Found ${reviews.length} reviews.\n`;
+						reviews.forEach((review: any, index: number) => {
+							formattedReviews += `\nReview ${index + 1} for ${review.business_name}:\n`;
+							formattedReviews += `Stars: ${review.stars}\n`;
+							formattedReviews += `Text: ${review.text}\n`;
+						});
+						setHistory(prev => [...prev, formattedReviews]);
+					} catch (e) {
+						setHistory(prev => [...prev, `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}`]);
+					}
+				} else {
+					setHistory(prev => [...prev, `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}`]);
+				}
+			});
+
+		} else {
+			setHistory((prevHistory) => [
+				...prevHistory,
+				`> ${command}`,
+				`Tanner AI: ${command}`
+			]);
+		}
+	};
+
 	useInput((input, key) => {
-		// Fix: Key type may not have 'name' or 'sequence', check safely
-		// Most key descriptors have only boolean props like ctrl, upArrow, downArrow, return, backspace, delete, etc.
 		if (key.ctrl && input.toLowerCase() === 'c') {
 			exit();
 		}
@@ -136,11 +189,7 @@ const App = () => {
 			}
 		} else {
 			if (key.return) {
-				setHistory((prevHistory) => [
-					...prevHistory,
-					`> ${inputValue}`,
-					`Tanner AI: ${inputValue}`
-				]);
+				handleCommand(inputValue);
 				setInputValue('');
 			} else if (key.backspace || key.delete) {
 				setInputValue(inputValue.slice(0, -1));

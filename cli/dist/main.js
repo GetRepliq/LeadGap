@@ -3,6 +3,11 @@ import React, { useState, useEffect } from "react";
 import { render, Box, Text, useInput, useApp } from "ink";
 import Gradient from "ink-gradient";
 import fs from "fs";
+import { spawn } from "child_process";
+import path from "path";
+import { fileURLToPath } from "url";
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path.dirname(__filename);
 var HEADER_ASCII = `
 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2557 
 \u255A\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557
@@ -48,6 +53,55 @@ var App = () => {
       });
     }
   }, [suggestionBoxVisible]);
+  const handleCommand = (command) => {
+    const extractorCommand = "extract reviews for ";
+    if (command.startsWith(extractorCommand)) {
+      const searchQuery = command.substring(extractorCommand.length);
+      setHistory((prev) => [...prev, `> ${command}`, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
+      const pythonScriptPath = path.join(__dirname, "..", "core", "utils.py");
+      const pythonProcess = spawn("python3", [pythonScriptPath, searchQuery]);
+      let stdoutData = "";
+      let stderrData = "";
+      pythonProcess.stdout.on("data", (data) => {
+        stdoutData += data.toString();
+      });
+      pythonProcess.stderr.on("data", (data) => {
+        const message = data.toString();
+        setHistory((prev) => [...prev, `Tanner AI: ${message}`]);
+        stderrData += message;
+      });
+      pythonProcess.on("close", (code) => {
+        if (code === 0) {
+          try {
+            const reviews = JSON.parse(stdoutData);
+            let formattedReviews = `Tanner AI: Found ${reviews.length} reviews.
+`;
+            reviews.forEach((review, index) => {
+              formattedReviews += `
+Review ${index + 1} for ${review.business_name}:
+`;
+              formattedReviews += `Stars: ${review.stars}
+`;
+              formattedReviews += `Text: ${review.text}
+`;
+            });
+            setHistory((prev) => [...prev, formattedReviews]);
+          } catch (e) {
+            setHistory((prev) => [...prev, `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}`]);
+          }
+        } else {
+          setHistory((prev) => [...prev, `Tanner AI: Error during review extraction (exit code ${code}).
+${stderrData}`]);
+        }
+      });
+    } else {
+      setHistory((prevHistory) => [
+        ...prevHistory,
+        `> ${command}`,
+        `Tanner AI: ${command}`
+      ]);
+    }
+  };
   useInput((input, key) => {
     if (key.ctrl && input.toLowerCase() === "c") {
       exit();
@@ -70,11 +124,7 @@ var App = () => {
       }
     } else {
       if (key.return) {
-        setHistory((prevHistory) => [
-          ...prevHistory,
-          `> ${inputValue}`,
-          `Tanner AI: ${inputValue}`
-        ]);
+        handleCommand(inputValue);
         setInputValue("");
       } else if (key.backspace || key.delete) {
         setInputValue(inputValue.slice(0, -1));
