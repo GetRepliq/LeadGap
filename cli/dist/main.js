@@ -8,11 +8,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 // core/agent.js
-var GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-var GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent`;
+var ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+var ANTHROPIC_API_URL = `https://api.anthropic.com/v1/messages`;
 async function analyzeReviews(reviews) {
-  if (!GEMINI_API_KEY) {
-    return "ERROR: GEMINI_API_KEY not found in .env file. Please set it up to enable AI analysis.";
+  if (!ANTHROPIC_API_KEY) {
+    return "ERROR: ANTHROPIC_API_KEY not found in .env file. Please set it up to enable AI analysis.";
   }
   if (!reviews || reviews.length === 0) {
     return "No reviews were provided to analyze.";
@@ -25,98 +25,127 @@ async function analyzeReviews(reviews) {
     acc[businessName].push(review);
     return acc;
   }, {});
-  let fullAnalysisOutput = "--- AI-Powered Review Analysis ---";
-  for (const businessName in reviewsByBusiness) {
-    fullAnalysisOutput += `
---- Business: ${businessName} ---
-`;
-    const businessReviews = reviewsByBusiness[businessName];
-    const reviewTexts = businessReviews.map((r) => `"${r.text}" (Rating: ${r.stars})`).join("\n- ");
-    const prompt = `You are a highly skilled marketing analyst specializing in customer feedback.
-Your task is to analyze a set of customer reviews for "${businessName}".
-For each business, provide a concise summary, identify key positive remarks, list actionable complaints (along with frustration intensity), and detect any buying intent.
+  const businessNames = Object.keys(reviewsByBusiness);
+  const businessesBlock = businessNames.map((businessName) => {
+    const reviewTexts = reviewsByBusiness[businessName].map((r) => `"${r.text}" (Rating: ${r.stars})`).join("\n    - ");
+    return `Business: "${businessName}"
+  Reviews:
+    - ${reviewTexts}`;
+  }).join("\n\n");
+  const prompt = `You are a highly skilled marketing analyst specializing in customer feedback.
+Your task is to analyze customer reviews for MULTIPLE businesses in a single pass.
 
-Return your analysis as a single JSON object.
+For each business, provide:
+- A concise summary
+- Key positive remarks
+- Actionable complaints with frustration intensity (low, medium, or high)
+- Any detected buying intent
+
+Return your analysis as a single JSON object with a top-level key "businesses" which is an array of objects, one per business.
 
 Example JSON structure:
 {
-  "summary": "Overall summary of the reviews for this business.",
-  "positive_remarks": ["List of key positive points."],
-  "actionable_complaints": [
+  "businesses": [
     {
-      "complaint": "Specific complaint that the business can act on.",
-      "frustration_intensity": "low" // 'low', 'medium', or 'high'
+      "business_name": "Example Business",
+      "summary": "Overall summary of the reviews for this business.",
+      "positive_remarks": ["Key positive point 1.", "Key positive point 2."],
+      "actionable_complaints": [
+        {
+          "complaint": "Specific complaint that the business can act on.",
+          "frustration_intensity": "low"
+        }
+      ],
+      "buying_intent": {
+        "detected": false,
+        "explanation": "If true, explain why buying intent was detected."
+      }
     }
-  ],
-  "buying_intent": {
-    "detected": false, // true/false
-    "explanation": "If true, explain why buying intent was detected."
-  }
+  ]
 }
 
-Analyze the following reviews for "${businessName}":
-- ${reviewTexts}
+Analyze the following businesses and their reviews:
+
+${businessesBlock}
 `;
-    try {
-      const response = await fetch(GEMINI_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": GEMINI_API_KEY
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
+  let fullAnalysisOutput = "--- AI-Powered Review Analysis ---";
+  try {
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${ANTHROPIC_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a highly skilled marketing analyst specializing in customer feedback. Always respond with valid JSON only, no preamble or markdown wrapping."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    const responseData = await response.json();
+    const llmText = responseData.choices?.[0]?.message?.content;
+    if (!llmText) {
+      return fullAnalysisOutput + `
+  AI Analysis: Could not get a response from the LLM. Raw response: ${JSON.stringify(responseData)}`;
+    }
+    const jsonMatch = llmText.match(/```json\n([\s\S]*?)\n```/);
+    let analysisJson;
+    if (jsonMatch && jsonMatch[1]) {
+      analysisJson = JSON.parse(jsonMatch[1]);
+    } else {
+      try {
+        analysisJson = JSON.parse(llmText);
+      } catch (parseError) {
+        return fullAnalysisOutput + `
+  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`;
       }
-      const responseData = await response.json();
-      const llmText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!llmText) {
-        fullAnalysisOutput += `  AI Analysis: Could not get a response from the LLM for this business. Raw LLM response: ${JSON.stringify(responseData)}
+    }
+    const businesses = analysisJson.businesses || [];
+    if (businesses.length === 0) {
+      return fullAnalysisOutput + `
+  AI Analysis: The LLM returned no business data. Raw parsed JSON: ${JSON.stringify(analysisJson)}`;
+    }
+    for (const business of businesses) {
+      fullAnalysisOutput += `
+--- Business: ${business.business_name || "Unknown"} ---
 `;
-        continue;
-      }
-      const jsonMatch = llmText.match(/```json\n([\s\S]*?)\n```/);
-      let analysisJson;
-      if (jsonMatch && jsonMatch[1]) {
-        analysisJson = JSON.parse(jsonMatch[1]);
-      } else {
-        try {
-          analysisJson = JSON.parse(llmText);
-        } catch (parseError) {
-          fullAnalysisOutput += `  AI Analysis: Could not parse LLM's JSON response for this business. Raw LLM text: ${llmText}
+      fullAnalysisOutput += `  Summary: ${business.summary || "N/A"}
 `;
-          continue;
-        }
-      }
-      fullAnalysisOutput += `  Summary: ${analysisJson.summary || "N/A"}
-`;
-      if (analysisJson.positive_remarks && analysisJson.positive_remarks.length > 0) {
-        fullAnalysisOutput += `  Positive Remarks: ${analysisJson.positive_remarks.join(", ")}
+      if (business.positive_remarks && business.positive_remarks.length > 0) {
+        fullAnalysisOutput += `  Positive Remarks: ${business.positive_remarks.join(", ")}
 `;
       }
-      if (analysisJson.actionable_complaints && analysisJson.actionable_complaints.length > 0) {
+      if (business.actionable_complaints && business.actionable_complaints.length > 0) {
         fullAnalysisOutput += `  Actionable Complaints:
 `;
-        analysisJson.actionable_complaints.forEach((comp, idx) => {
+        business.actionable_complaints.forEach((comp, idx) => {
           fullAnalysisOutput += `    ${idx + 1}. ${comp.complaint} (Frustration: ${comp.frustration_intensity || "N/A"})
 `;
         });
       }
-      if (analysisJson.buying_intent && analysisJson.buying_intent.detected) {
-        fullAnalysisOutput += `  Buying Intent Detected: Yes - ${analysisJson.buying_intent.explanation || "N/A"}
+      if (business.buying_intent && business.buying_intent.detected) {
+        fullAnalysisOutput += `  Buying Intent Detected: Yes - ${business.buying_intent.explanation || "N/A"}
 `;
-      } else if (analysisJson.buying_intent && !analysisJson.buying_intent.detected) {
+      } else if (business.buying_intent && !business.buying_intent.detected) {
         fullAnalysisOutput += `  Buying Intent Detected: No
 `;
       }
-    } catch (error) {
-      fullAnalysisOutput += `  AI Analysis Error for ${businessName}: ${error.message}
-`;
-      console.error(`Error during LLM analysis for ${businessName}:`, error);
     }
+  } catch (error) {
+    fullAnalysisOutput += `
+  AI Analysis Error: ${error.message}`;
+    console.error("Error during batched LLM analysis:", error);
   }
   return fullAnalysisOutput;
 }
