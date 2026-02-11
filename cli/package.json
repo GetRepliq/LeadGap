@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/regional-specter/Harvey#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.15.0",
     "dotenv": "^16.4.5",
     "ink": "^6.6.0",
     "ink-gradient": "^3.0.0",

@@ -1,24 +1,34 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 // The dotenv package is now loaded via the --require flag in the `npm start` script
 // This ensures that process.env variables are available before any code runs.
 
-// --- Anthropic Claude API Configuration ---
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_API_URL = `https://api.anthropic.com/v1/messages`;
+// --- Gemini API Configuration ---
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 /**
- * Analyzes an array of review objects using a Large Language Model (LLM).
- * All businesses are sent in a single batched API call to avoid rate limits.
+ * Analyzes an array of review objects using the @google/generative-ai library.
+ * All businesses are sent in a single batched API call.
  *
  * @param {Array<Object>} reviews - An array of review objects, each expected to have 'business_name', 'stars', and 'text'.
  * @returns {Promise<string>} A formatted string containing the LLM-generated analysis of the reviews.
  */
 export async function analyzeReviews(reviews) {
-  if (!ANTHROPIC_API_KEY) {
-    return "ERROR: ANTHROPIC_API_KEY not found in .env file. Please set it up to enable AI analysis.";
+  if (!GEMINI_API_KEY) {
+    return "ERROR: GEMINI_API_KEY not found. Please ensure it is set in your .env file.";
   }
   if (!reviews || reviews.length === 0) {
     return "No reviews were provided to analyze.";
   }
+
+  // Initialize the Google Generative AI client
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({
+    model: "models/gemini-flash-latest",
+    generationConfig: {
+      responseMimeType: "application/json", // Request JSON output
+    },
+  });
 
   // Group reviews by business name for structured processing
   const reviewsByBusiness = reviews.reduce((acc, review) => {
@@ -40,8 +50,10 @@ export async function analyzeReviews(reviews) {
     return `Business: "${businessName}"\n  Reviews:\n    - ${reviewTexts}`;
   }).join('\n\n');
 
-  const prompt = `You are a highly skilled marketing analyst specializing in customer feedback.
-Your task is to analyze customer reviews for MULTIPLE businesses in a single pass.
+  const prompt = `You are a highly skilled marketing analyst. Your task is to analyze customer reviews for MULTIPLE businesses in a single pass.
+
+Analyze the following businesses and their reviews:
+${businessesBlock}
 
 For each business, provide:
 - A concise summary
@@ -49,7 +61,7 @@ For each business, provide:
 - Actionable complaints with frustration intensity (low, medium, or high)
 - Any detected buying intent
 
-Return your analysis as a single JSON object with a top-level key "businesses" which is an array of objects, one per business.
+Return your analysis as a single JSON object with a top-level key "businesses" which is an array of objects, one per business. Your entire response must be only the raw JSON object, with no markdown formatting or other text.
 
 Example JSON structure:
 {
@@ -71,61 +83,21 @@ Example JSON structure:
     }
   ]
 }
-
-Analyze the following businesses and their reviews:
-
-${businessesBlock}
 `;
 
-  let fullAnalysisOutput = "--- AI-Powered Review Analysis ---";
+  let fullAnalysisOutput = "--- AI-Powered Review Analysis ---\n";
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ANTHROPIC_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a highly skilled marketing analyst specializing in customer feedback. Always respond with valid JSON only, no preamble or markdown wrapping.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-
-    const responseData = await response.json();
-
-    // Extract the text from OpenAI's response structure
-    const llmText = responseData.choices?.[0]?.message?.content;
-
-    if (!llmText) {
-      return fullAnalysisOutput + `\n  AI Analysis: Could not get a response from the LLM. Raw response: ${JSON.stringify(responseData)}`;
-    }
-
-    // LLMs sometimes wrap JSON in markdown code blocks — strip them if present
-    const jsonMatch = llmText.match(/```json\n([\s\S]*?)\n```/);
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const llmText = response.text();
+    
     let analysisJson;
-
-    if (jsonMatch && jsonMatch[1]) {
-      analysisJson = JSON.parse(jsonMatch[1]);
-    } else {
-      try {
-        analysisJson = JSON.parse(llmText);
-      } catch (parseError) {
-        return fullAnalysisOutput + `\n  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`;
-      }
+    try {
+      // Since we requested JSON output, we can parse it directly
+      analysisJson = JSON.parse(llmText);
+    } catch (parseError) {
+      return fullAnalysisOutput + `\n  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`;
     }
 
     // --- Format the parsed batch response for each business ---
