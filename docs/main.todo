@@ -6,7 +6,7 @@ Data Ingestion and Collection:
      ☐ Temporary Market Research Cache Module for LLM prompting
 
 Data Preprocessing & NLP Signal Extraction:
-     ☐ Preprocess data for normalisation and removal of irrelevant information
+     ✔ Preprocess data for normalisation and removal of irrelevant information (Filtering System) @done(26-02-11 19:11)
      ☐ Remove spams, duplicates, low-signal reviews
      ☐ Pattern Grouping and Frequency Weighting for all collected reviews
      ☐ Importance score rating and Intent scoring with language patterns
