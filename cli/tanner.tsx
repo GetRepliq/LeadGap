@@ -117,13 +117,44 @@ const App = () => {
 	}, [suggestionBoxVisible]);
 
 	const handleCommand = (command: string) => {
-		const extractorCommand = "extract reviews for ";
-		if (command.startsWith(extractorCommand)) {
-			const searchQuery = command.substring(extractorCommand.length);
-			setHistory(prev => [...prev, `> ${command}`, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
+		const extractorRegex = /^extract reviews? for /i; // Matches "review" or "reviews", case-insensitive
+
+		if (extractorRegex.test(command)) {
+			const fullCommand = command; // Keep original for display
+			let searchQuery = fullCommand.replace(extractorRegex, '').trim();
+			
+			let minStars: number | undefined;
+			let maxStars: number | undefined;
+
+			// Regex to find --min-stars and --max-stars
+			const minStarsMatch = fullCommand.match(/--min-stars (\d+)/);
+			if (minStarsMatch) {
+				minStars = parseInt(minStarsMatch[1], 10);
+				searchQuery = searchQuery.replace(minStarsMatch[0], '').trim(); // Remove from search query
+			}
+
+			const maxStarsMatch = fullCommand.match(/--max-stars (\d+)/);
+			if (maxStarsMatch) {
+				maxStars = parseInt(maxStarsMatch[1], 10);
+				searchQuery = searchQuery.replace(maxStarsMatch[0], '').trim(); // Remove from search query
+			}
+
+			// Clean up extra spaces in search query after removing args
+			searchQuery = searchQuery.replace(/\s\s+/g, ' ').trim();
+
+			setHistory(prev => [...prev, `> ${fullCommand}`, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
 			
 			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py'); // Adjusted path
-			const pythonProcess = spawn('python3', [pythonScriptPath, searchQuery]);
+			const pythonArgs: string[] = [pythonScriptPath, searchQuery];
+
+			if (minStars !== undefined) {
+				pythonArgs.push('--min_stars', minStars.toString());
+			}
+			if (maxStars !== undefined) {
+				pythonArgs.push('--max_stars', maxStars.toString());
+			}
+
+			const pythonProcess = spawn('python3', pythonArgs);
 
 			let stdoutData = '';
 			let stderrData = '';

@@ -14,7 +14,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-def scrape_all_business_reviews(search_query, max_businesses=2, reviews_per_business=5):
+def scrape_all_business_reviews(search_query, max_businesses=2, reviews_per_business=5, min_stars=1, max_stars=5):
     """
     Scrapes Google Maps reviews for multiple businesses from a search query using Selenium.
     This approach is more robust by iterating through businesses, extracting names first,
@@ -318,11 +318,23 @@ def scrape_all_business_reviews(search_query, max_businesses=2, reviews_per_busi
                 
                 # Only add if we found at least review text
                 if review_text:
-                    all_reviews_data.append({
-                        "business_name": current_business_name,
-                        "stars": star_rating if star_rating else "No rating",
-                        "text": review_text
-                    })
+                    numerical_star_rating = None
+                    if star_rating and "stars" in star_rating:
+                        try:
+                            # Extract numerical part, e.g., "5.0 stars" -> 5.0
+                            numerical_star_rating = float(star_rating.split(" ")[0])
+                        except ValueError:
+                            pass # Handle cases where parsing fails
+
+                    # Filter based on star ratings
+                    if numerical_star_rating is not None and \
+                       min_stars <= numerical_star_rating <= max_stars:
+                        all_reviews_data.append({
+                            "business_name": current_business_name,
+                            "stars": star_rating, # Keep original string for display
+                            "numerical_stars": numerical_star_rating, # Add numerical value
+                            "text": review_text
+                        })
                     # Show more of the review text in the log to verify we got the full text
                     eprint(f"  Extracted review {len(all_reviews_data)}: {review_text[:100]}...")
 
@@ -354,13 +366,17 @@ if __name__ == '__main__':
     parser.add_argument("search_query", help="The search query for Google Maps (e.g., 'ramen in san francisco').")
     parser.add_argument("--max_businesses", type=int, default=3, help="Maximum number of businesses to scrape.")
     parser.add_argument("--reviews_per_business", type=int, default=10, help="Number of reviews to scrape per business.")
+    parser.add_argument("--min_stars", type=int, default=1, help="Minimum star rating to include in scraped reviews (1-5).")
+    parser.add_argument("--max_stars", type=int, default=5, help="Maximum star rating to include in scraped reviews (1-5).")
     args = parser.parse_args()
 
     # The scraping function now prints progress to stderr, so we can capture JSON from stdout.
     scraped_data = scrape_all_business_reviews(
         args.search_query,
         max_businesses=args.max_businesses,
-        reviews_per_business=args.reviews_per_business
+        reviews_per_business=args.reviews_per_business,
+        min_stars=args.min_stars,
+        max_stars=args.max_stars
     )
     
     # Output the final data as a JSON string to stdout

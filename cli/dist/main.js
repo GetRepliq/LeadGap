@@ -1081,12 +1081,33 @@ var App = () => {
     }
   }, [suggestionBoxVisible]);
   const handleCommand = (command) => {
-    const extractorCommand = "extract reviews for ";
-    if (command.startsWith(extractorCommand)) {
-      const searchQuery = command.substring(extractorCommand.length);
-      setHistory((prev) => [...prev, `> ${command}`, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
+    const extractorRegex = /^extract reviews? for /i;
+    if (extractorRegex.test(command)) {
+      const fullCommand = command;
+      let searchQuery = fullCommand.replace(extractorRegex, "").trim();
+      let minStars;
+      let maxStars;
+      const minStarsMatch = fullCommand.match(/--min-stars (\d+)/);
+      if (minStarsMatch) {
+        minStars = parseInt(minStarsMatch[1], 10);
+        searchQuery = searchQuery.replace(minStarsMatch[0], "").trim();
+      }
+      const maxStarsMatch = fullCommand.match(/--max-stars (\d+)/);
+      if (maxStarsMatch) {
+        maxStars = parseInt(maxStarsMatch[1], 10);
+        searchQuery = searchQuery.replace(maxStarsMatch[0], "").trim();
+      }
+      searchQuery = searchQuery.replace(/\s\s+/g, " ").trim();
+      setHistory((prev) => [...prev, `> ${fullCommand}`, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
       const pythonScriptPath = path.join(__dirname, "..", "core", "utils.py");
-      const pythonProcess = spawn("python3", [pythonScriptPath, searchQuery]);
+      const pythonArgs = [pythonScriptPath, searchQuery];
+      if (minStars !== void 0) {
+        pythonArgs.push("--min_stars", minStars.toString());
+      }
+      if (maxStars !== void 0) {
+        pythonArgs.push("--max_stars", maxStars.toString());
+      }
+      const pythonProcess = spawn("python3", pythonArgs);
       let stdoutData = "";
       let stderrData = "";
       pythonProcess.stdout.on("data", (data) => {
