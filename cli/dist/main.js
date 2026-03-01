@@ -2831,6 +2831,7 @@ var FileSuggestions = ({ suggestions, activeIndex }) => {
     return /* @__PURE__ */ React2.createElement(Text2, { key: suggestion, color }, suggestion);
   }));
 };
+var ToolCallDisplay = ({ toolCall }) => /* @__PURE__ */ React2.createElement(Box, { flexDirection: "column", paddingBottom: 1 }, /* @__PURE__ */ React2.createElement(Text2, { color: "blue" }, toolCall.name, ' ("', toolCall.query, '")'), /* @__PURE__ */ React2.createElement(Box, { marginLeft: 2 }, /* @__PURE__ */ React2.createElement(Text2, { color: "gray" }, "\u2514 ", toolCall.status)));
 var Processing = () => /* @__PURE__ */ React2.createElement(Box, null, /* @__PURE__ */ React2.createElement(Text2, null, /* @__PURE__ */ React2.createElement(build_default, null), " Processing..."));
 var App = () => {
   const { exit } = useApp();
@@ -2840,6 +2841,7 @@ var App = () => {
   const [suggestionBoxVisible, setSuggestionBoxVisible] = useState2(false);
   const [activeIndex, setActiveIndex] = useState2(0);
   const [isProcessing, setIsProcessing] = useState2(false);
+  const [activeToolCall, setActiveToolCall] = useState2(null);
   useEffect2(() => {
     if (suggestionBoxVisible) {
       fs.readdir(process.cwd(), (err, files) => {
@@ -2856,6 +2858,7 @@ var App = () => {
     const { intent, searchQuery, detail } = await classifyIntent(command);
     if (intent === "extract_reviews" && searchQuery) {
       setHistory((prev) => [...prev, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
+      setActiveToolCall({ name: "Google Reviews Extraction", query: searchQuery, status: "Finding reviews..." });
       const pythonScriptPath = path.join(__dirname, "..", "core", "utils.py");
       const pythonArgs = [pythonScriptPath, searchQuery];
       const pythonProcess = spawn("python3", pythonArgs);
@@ -2863,6 +2866,10 @@ var App = () => {
       let stderrData = "";
       pythonProcess.stdout.on("data", (data) => {
         stdoutData += data.toString();
+        const match = data.toString().match(/Found (\d+) reviews/);
+        if (match && match[1]) {
+          setActiveToolCall((prev) => prev ? { ...prev, status: `Finding reviews for "${searchQuery}"` } : null);
+        }
       });
       pythonProcess.stderr.on("data", (data) => {
         stderrData += data.toString();
@@ -2872,6 +2879,7 @@ var App = () => {
           try {
             const reviews = JSON.parse(stdoutData);
             setHistory((prev) => [...prev, `Tanner AI: Found ${reviews.length} reviews. Now analyzing...`]);
+            setActiveToolCall((prev) => prev ? { ...prev, status: `Found ${reviews.length} reviews. Analyzing...` } : null);
             const analysis = await analyzeReviews(reviews);
             setHistory((prev) => [...prev, `Tanner AI:
 ${analysis}`]);
@@ -2883,13 +2891,16 @@ ${analysis}`]);
 ${stderrData}`]);
         }
         setIsProcessing(false);
+        setActiveToolCall(null);
       });
     } else if (intent === "error") {
       setHistory((prev) => [...prev, `Tanner AI: Error: ${detail}`]);
       setIsProcessing(false);
+      setActiveToolCall(null);
     } else {
       setHistory((prev) => [...prev, `Tanner AI: ${command}`]);
       setIsProcessing(false);
+      setActiveToolCall(null);
     }
   };
   useInput((input, key) => {
@@ -2926,7 +2937,7 @@ ${stderrData}`]);
       }
     }
   });
-  return /* @__PURE__ */ React2.createElement(Box, { flexDirection: "column", width: "100%", height: "100%" }, /* @__PURE__ */ React2.createElement(Header, null), /* @__PURE__ */ React2.createElement(ChatHistory, { history }), /* @__PURE__ */ React2.createElement(Box, { flexGrow: 1 }), isProcessing && /* @__PURE__ */ React2.createElement(Processing, null), /* @__PURE__ */ React2.createElement(
+  return /* @__PURE__ */ React2.createElement(Box, { flexDirection: "column", width: "100%", height: "100%" }, /* @__PURE__ */ React2.createElement(Header, null), /* @__PURE__ */ React2.createElement(ChatHistory, { history }), /* @__PURE__ */ React2.createElement(Box, { flexGrow: 1 }), activeToolCall && /* @__PURE__ */ React2.createElement(ToolCallDisplay, { toolCall: activeToolCall }), isProcessing && /* @__PURE__ */ React2.createElement(Processing, null), /* @__PURE__ */ React2.createElement(
     InputBox,
     {
       value: inputValue
