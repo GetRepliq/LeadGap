@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
+import Spinner from 'ink-spinner';
 import Gradient from 'ink-gradient';
 import fs from 'fs';
 import { spawn } from 'child_process';
@@ -96,6 +97,14 @@ const FileSuggestions: React.FC<FileSuggestionsProps> = ({ suggestions, activeIn
 	);
 };
 
+const Processing = () => (
+	<Box>
+		<Text>
+			<Spinner /> Processing...
+		</Text>
+	</Box>
+);
+
 const App = () => {
 	const { exit } = useApp();
 	const [history, setHistory] = useState<string[]>([]);
@@ -103,6 +112,7 @@ const App = () => {
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 	const [suggestionBoxVisible, setSuggestionBoxVisible] = useState(false);
 	const [activeIndex, setActiveIndex] = useState(0);
+	const [isProcessing, setIsProcessing] = useState(false);
 
 	useEffect(() => {
 		if (suggestionBoxVisible) {
@@ -117,6 +127,7 @@ const App = () => {
 	}, [suggestionBoxVisible]);
 
 	const handleCommand = (command: string) => {
+		setIsProcessing(true);
 		const extractorRegex = /^extract reviews? for /i; // Matches "review" or "reviews", case-insensitive
 
 		if (extractorRegex.test(command)) {
@@ -185,6 +196,7 @@ const App = () => {
 				} else {
 					setHistory(prev => [...prev, `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}`]);
 				}
+				setIsProcessing(false);
 			});
 
 		} else {
@@ -193,6 +205,7 @@ const App = () => {
 				`> ${command}`,
 				`Tanner AI: ${command}`
 			]);
+			setIsProcessing(false);
 		}
 	};
 
@@ -238,6 +251,7 @@ const App = () => {
 			<Header />
 			<ChatHistory history={history} />
 			<Box flexGrow={1} />
+			{isProcessing && <Processing />}
 			<InputBox
 				value={inputValue}
 			/>
