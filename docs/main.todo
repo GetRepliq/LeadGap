@@ -13,6 +13,11 @@ Data Preprocessing & NLP Signal Extraction:
      ☐ Use NLP or LLMs for Pain Point and market gap detection using language patterns
 
 Serviec Gap & Strategy Mapping:
-     ☐ Suppy-Demand Detection for currentlt faced pain points
+     ☐ Suppy-Demand Detection for currently faced pain points
      ☐ Ranks processed service gaps based on opportunity size, urgency and conversion rates
      ☐ Convert model outputs into recommendations and small set of high-confidence actions
+
+
+User Experience & Feature Updates :
+     ☐ Update TUI for realtime user-feedback on processing
+     ☐ Update reviews extracted response for better comprehensibility
