@@ -20,5 +20,5 @@ Serviec Gap & Strategy Mapping:
 
 User Experience & Feature Updates :
      ✔ Update TUI for realtime user-feedback on processing @done(26-03-01 21:26)
-     ☐ Update the agent's intent-extraction
+     ✔ Update the agent's intent-extraction @done(26-03-01 21:32)
      ☐ Update reviews extracted response for better comprehensibility

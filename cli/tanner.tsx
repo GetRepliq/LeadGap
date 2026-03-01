@@ -6,7 +6,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url'; // Added for ESM __dirname equivalent
-import { analyzeReviews } from './core/agent.js';
+import { analyzeReviews, classifyIntent } from './core/agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,45 +126,17 @@ const App = () => {
 		}
 	}, [suggestionBoxVisible]);
 
-	const handleCommand = (command: string) => {
+	const handleCommand = async (command: string) => {
 		setIsProcessing(true);
-		const extractorRegex = /^extract reviews? for /i; // Matches "review" or "reviews", case-insensitive
+		setHistory(prev => [...prev, `> ${command}`]);
 
-		if (extractorRegex.test(command)) {
-			const fullCommand = command; // Keep original for display
-			let searchQuery = fullCommand.replace(extractorRegex, '').trim();
-			
-			let minStars: number | undefined;
-			let maxStars: number | undefined;
+		const { intent, searchQuery, detail } = await classifyIntent(command);
 
-			// Regex to find --min-stars and --max-stars
-			const minStarsMatch = fullCommand.match(/--min-stars (\d+)/);
-			if (minStarsMatch) {
-				minStars = parseInt(minStarsMatch[1], 10);
-				searchQuery = searchQuery.replace(minStarsMatch[0], '').trim(); // Remove from search query
-			}
+		if (intent === 'extract_reviews' && searchQuery) {
+			setHistory(prev => [...prev, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
 
-			const maxStarsMatch = fullCommand.match(/--max-stars (\d+)/);
-			if (maxStarsMatch) {
-				maxStars = parseInt(maxStarsMatch[1], 10);
-				searchQuery = searchQuery.replace(maxStarsMatch[0], '').trim(); // Remove from search query
-			}
-
-			// Clean up extra spaces in search query after removing args
-			searchQuery = searchQuery.replace(/\s\s+/g, ' ').trim();
-
-			setHistory(prev => [...prev, `> ${fullCommand}`, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
-			
-			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py'); // Adjusted path
-			const pythonArgs: string[] = [pythonScriptPath, searchQuery];
-
-			if (minStars !== undefined) {
-				pythonArgs.push('--min_stars', minStars.toString());
-			}
-			if (maxStars !== undefined) {
-				pythonArgs.push('--max_stars', maxStars.toString());
-			}
-
+			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py');
+			const pythonArgs = [pythonScriptPath, searchQuery];
 			const pythonProcess = spawn('python3', pythonArgs);
 
 			let stdoutData = '';
@@ -175,10 +147,7 @@ const App = () => {
 			});
 
 			pythonProcess.stderr.on('data', (data) => {
-				const message = data.toString();
-				// Suppress Python script's stderr output from chat for a cleaner summary response
-				// setHistory(prev => [...prev, `Tanner AI: ${message}`]); 
-				stderrData += message;
+				stderrData += data.toString();
 			});
 
 			pythonProcess.on('close', async (code) => {
@@ -198,13 +167,12 @@ const App = () => {
 				}
 				setIsProcessing(false);
 			});
-
-		} else {
-			setHistory((prevHistory) => [
-				...prevHistory,
-				`> ${command}`,
-				`Tanner AI: ${command}`
-			]);
+		} else if (intent === 'error') {
+			setHistory(prev => [...prev, `Tanner AI: Error: ${detail}`]);
+			setIsProcessing(false);
+		}
+		else {
+			setHistory(prev => [...prev, `Tanner AI: ${command}`]);
 			setIsProcessing(false);
 		}
 	};

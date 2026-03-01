@@ -1,8 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// The dotenv package is now loaded via the --require flag in the `npm start` script
-// This ensures that process.env variables are available before any code runs.
-
 // --- Gemini API Configuration ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -136,4 +133,63 @@ Example JSON structure:
   }
 
   return fullAnalysisOutput;
+}
+
+export async function classifyIntent(command) {
+  if (!GEMINI_API_KEY) {
+    return { intent: "error", detail: "GEMINI_API_KEY not found." };
+  }
+
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({
+    model: "models/gemini-flash-latest",
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
+  });
+
+  const prompt = `You are an intent classification AI. You need to determine if the user's goal is to 'extract reviews' for a specific entity.
+
+  The user's command is: "${command}"
+
+  Your task is to respond with a JSON object that has two fields:
+  1. "intent": This should be either "extract_reviews" or "other".
+  2. "searchQuery": If the intent is "extract_reviews", this field should contain the specific topic or entity the user wants to find reviews for. If the intent is "other", this field should be null.
+
+  Example 1:
+  User command: "Can you find reviews for the new coffee shop on Main Street?"
+  Your JSON response:
+  {
+    "intent": "extract_reviews",
+    "searchQuery": "the new coffee shop on Main Street"
+  }
+
+  Example 2:
+  User command: "hello, how are you?"
+  Your JSON response:
+  {
+    "intent": "other",
+    "searchQuery": null
+  }
+
+  Example 3:
+  User command: "show me what people are saying about 'Global Pizzeria'"
+  Your JSON response:
+  {
+    "intent": "extract_reviews",
+    "searchQuery": "Global Pizzeria"
+  }
+
+  Now, process the user's command.
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const llmText = response.text();
+    return JSON.parse(llmText);
+  } catch (error) {
+    console.error('Error during intent classification:', error);
+    return { intent: "error", detail: "Failed to classify intent." };
+  }
 }
