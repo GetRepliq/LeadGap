@@ -2,7 +2,8 @@ Data Ingestion and Collection:
      ✔ Endpoint for Google Reviews collection and scraping @done(26-01-29 17:54)
      ✔ Improve performance for Google Reviews Endpoint @done(26-01-30 18:31)
      ☐ Experimental Reddit Scanner module for market gaps
-     ☐ Reviews Filtering system for only bad reviews/negative reviews
+     ✔ Reviews Filtering system for only bad reviews/negative reviews @done(26-03-01 21:54)
+     ☐ Experiment with large-scale reviews extraction through google (stress test)
      ☐ Temporary Market Research Cache Module for LLM prompting
 
 Data Preprocessing & NLP Signal Extraction:
