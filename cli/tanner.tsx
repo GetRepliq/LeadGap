@@ -97,12 +97,16 @@ const FileSuggestions: React.FC<FileSuggestionsProps> = ({ suggestions, activeIn
 	);
 };
 
-const ToolCallDisplay: React.FC<{toolCall: {name: string; query: string; status: string}}> = ({ toolCall }) => (
+
+
+const ToolCallDisplay: React.FC<{toolCall: {name: string; query: string}; status: string[]}> = ({ toolCall, status }) => (
 	<Box flexDirection="column" paddingBottom={1}>
 		<Text color="blue">{toolCall.name} ("{toolCall.query}")</Text>
-		<Box marginLeft={2}>
-			<Text color="gray">└ {toolCall.status}</Text>
-		</Box>
+		{status.map((s, i) => (
+			<Box marginLeft={2} key={i}>
+				<Text color="gray">└ {s}</Text>
+			</Box>
+		))}
 	</Box>
 );
 
@@ -122,7 +126,9 @@ const App = () => {
 	const [suggestionBoxVisible, setSuggestionBoxVisible] = useState(false);
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [isProcessing, setIsProcessing] = useState(false);
-	const [activeToolCall, setActiveToolCall] = useState<{name: string; query: string; status: string} | null>(null);
+	const [startTime, setStartTime] = useState<number | null>(null);
+	const [activeToolCall, setActiveToolCall] = useState<{name: string; query: string} | null>(null);
+	const [toolCallStatus, setToolCallStatus] = useState<string[]>([]);
 
 	useEffect(() => {
 		if (suggestionBoxVisible) {
@@ -138,13 +144,16 @@ const App = () => {
 
 	const handleCommand = async (command: string) => {
 		setIsProcessing(true);
+		setToolCallStatus([]);
+		setActiveToolCall(null);
 		setHistory(prev => [...prev, `> ${command}`]);
 
 		const { intent, searchQuery, detail } = await classifyIntent(command);
 
 		if (intent === 'extract_reviews' && searchQuery) {
-			setHistory(prev => [...prev, `Tanner AI: Starting review extraction for "${searchQuery}"...`]);
-			setActiveToolCall({ name: "Google Reviews Extraction", query: searchQuery, status: "Finding reviews..." });
+			const toolStartTime = Date.now();
+			setActiveToolCall({ name: "Google Reviews Extraction", query: searchQuery });
+			setToolCallStatus(prev => [...prev, "Initiated."]);
 
 			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py');
 			const pythonArgs = [pythonScriptPath, searchQuery];
@@ -157,7 +166,7 @@ const App = () => {
 				stdoutData += data.toString();
 				const match = data.toString().match(/Found (\d+) reviews/);
 				if (match && match[1]) {
-					setActiveToolCall(prev => prev ? { ...prev, status: `Finding reviews for "${searchQuery}"` } : null);
+					setToolCallStatus(prev => [...prev, `Found ${match[1]} reviews. Analyzing...`]);
 				}
 			});
 
@@ -166,33 +175,37 @@ const App = () => {
 			});
 
 			pythonProcess.on('close', async (code) => {
+				const toolEndTime = Date.now();
+				const timeTakenSeconds = ((toolEndTime - toolStartTime) / 1000);
+				const minutes = Math.floor(timeTakenSeconds / 60);
+				const seconds = Math.round(timeTakenSeconds % 60);
+				const timeTakenString = minutes > 0 ? `${minutes} min ${seconds} sec` : `${seconds} sec`;
+
 				if (code === 0) {
 					try {
 						const reviews = JSON.parse(stdoutData);
-						setHistory(prev => [...prev, `Tanner AI: Found ${reviews.length} reviews. Now analyzing...`]);
-						setActiveToolCall(prev => prev ? { ...prev, status: `Found ${reviews.length} reviews. Analyzing...` } : null);
 						
 						const analysis = await analyzeReviews(reviews);
 						setHistory(prev => [...prev, `Tanner AI:\n${analysis}`]);
+						setToolCallStatus(prev => [...prev, `Completed in ${timeTakenString}.`]);
 
 					} catch (e) {
 						setHistory(prev => [...prev, `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}`]);
+						setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
 					}
 				} else {
 					setHistory(prev => [...prev, `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}`]);
+					setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
 				}
 				setIsProcessing(false);
-				setActiveToolCall(null);
 			});
 		} else if (intent === 'error') {
 			setHistory(prev => [...prev, `Tanner AI: Error: ${detail}`]);
 			setIsProcessing(false);
-			setActiveToolCall(null);
 		}
 		else {
 			setHistory(prev => [...prev, `Tanner AI: ${command}`]);
 			setIsProcessing(false);
-			setActiveToolCall(null);
 		}
 	};
 
@@ -238,7 +251,7 @@ const App = () => {
 			<Header />
 			<ChatHistory history={history} />
 			<Box flexGrow={1} />
-			{activeToolCall && <ToolCallDisplay toolCall={activeToolCall} />}
+			{activeToolCall && <ToolCallDisplay toolCall={activeToolCall} status={toolCallStatus} />}
 			{isProcessing && <Processing />}
 			<InputBox
 				value={inputValue}
