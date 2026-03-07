@@ -2871,10 +2871,6 @@ var App = () => {
       let stderrData = "";
       pythonProcess.stdout.on("data", (data) => {
         stdoutData += data.toString();
-        const match = data.toString().match(/Found (\d+) reviews/);
-        if (match && match[1]) {
-          setToolCallStatus((prev) => [...prev, `Found ${match[1]} reviews. Analyzing...`]);
-        }
       });
       pythonProcess.stderr.on("data", (data) => {
         stderrData += data.toString();
@@ -2888,6 +2884,8 @@ var App = () => {
         if (code === 0) {
           try {
             const reviews = JSON.parse(stdoutData);
+            const numReviews = reviews.length;
+            setToolCallStatus((prev) => [...prev, `Collected ${numReviews} reviews. Processing...`]);
             const analysis = await analyzeReviews(reviews);
             setHistory((prev) => [...prev, `Tanner AI:
 ${analysis}`]);

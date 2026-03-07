@@ -14,7 +14,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-def scrape_all_business_reviews(search_query, max_businesses=2, reviews_per_business=5, min_stars=1, max_stars=5):
+def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_business=10, min_stars=1, max_stars=5):
     """
     Scrapes Google Maps reviews for multiple businesses from a search query using Selenium.
     This approach is more robust by iterating through businesses, extracting names first,
