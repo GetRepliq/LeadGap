@@ -3,13 +3,13 @@ Data Ingestion and Collection:
      ✔ Improve performance for Google Reviews Endpoint @done(26-01-30 18:31)
      ☐ Experimental Reddit Scanner module for market gaps
      ✔ Reviews Filtering system for only bad reviews/negative reviews @done(26-03-01 21:54)
-     ☐ Experiment with large-scale reviews extraction through google (stress test)
+     ⏳ Experiment with large-scale reviews extraction through google (stress test) @inprogress(26-03-08 12:05)
      ☐ Temporary Market Research Cache Module for LLM prompting
 
 Data Preprocessing & NLP Signal Extraction:
      ✔ Preprocess data for normalisation and removal of irrelevant information (Filtering System) @done(26-02-11 19:11)
-     ☐ Remove spams, duplicates, low-signal reviews
-     ☐ Pattern Grouping and Frequency Weighting for all collected reviews
+     ⏳ Remove spams, duplicates, low-signal reviews @inprogress(26-03-08 12:08)
+     ⏳ Pattern Grouping and Frequency Weighting for all collected reviews @inprogress(26-03-08 12:08)
      ☐ Importance score rating and Intent scoring with language patterns
      ☐ Use NLP or LLMs for Pain Point and market gap detection using language patterns
 
@@ -17,7 +17,6 @@ Serviec Gap & Strategy Mapping:
      ☐ Suppy-Demand Detection for currently faced pain points
      ☐ Ranks processed service gaps based on opportunity size, urgency and conversion rates
      ☐ Convert model outputs into recommendations and small set of high-confidence actions
-
 
 User Experience & Feature Updates :
      ✔ Update TUI for realtime user-feedback on processing @done(26-03-01 21:26)

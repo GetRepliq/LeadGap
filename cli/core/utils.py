@@ -359,7 +359,40 @@ def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_busi
 
     driver.quit()
     eprint("\nScraping process finished and browser closed.")
-    return all_reviews_data[:(max_businesses * reviews_per_business)] # Ensure we don't exceed total scraped
+    filtered_reviews = filter_reviews(all_reviews_data[:(max_businesses * reviews_per_business)])
+    return filtered_reviews
+
+def filter_reviews(reviews, min_word_count=5):
+    """
+    Filters a list of review dictionaries to remove duplicates and low-signal reviews.
+    """
+    eprint(f"Starting review filtering. Initial count: {len(reviews)}")
+    
+    unique_reviews = []
+    seen_texts = set()
+
+    for review in reviews:
+        review_text = review.get("text")
+        if not review_text:
+            continue
+
+        # --- Remove Duplicates ---
+        # Using a simple hash of the text for duplicate detection
+        if review_text in seen_texts:
+            eprint(f"  Skipping duplicate review: {review_text[:50]}...")
+            continue
+        seen_texts.add(review_text)
+
+        # --- Remove Low-Signal Reviews ---
+        word_count = len(review_text.split())
+        if word_count < min_word_count:
+            eprint(f"  Skipping low-signal review (word count: {word_count}): {review_text[:50]}...")
+            continue
+        
+        unique_reviews.append(review)
+    
+    eprint(f"Filtering complete. Filtered count: {len(unique_reviews)}")
+    return unique_reviews
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scrape Google Maps reviews for a given search query.")
