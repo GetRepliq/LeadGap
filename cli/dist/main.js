@@ -1696,7 +1696,6 @@ function Spinner({ type = "dots" }) {
 var build_default = Spinner;
 
 // tanner.tsx
-import Gradient from "ink-gradient";
 import fs from "fs";
 import { spawn } from "child_process";
 import path from "path";
@@ -2811,7 +2810,10 @@ var HEADER_ASCII = `
    \u2588\u2588\u2551   \u2588\u2588\u2551  \u2588\u2588\u2551\u2588\u2588\u2551 \u255A\u2588\u2588\u2588\u2588\u2551\u2588\u2588\u2551 \u255A\u2588\u2588\u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551  \u2588\u2588\u2551
    \u255A\u2550\u255D   \u255A\u2550\u255D  \u255A\u2550\u255D\u255A\u2550\u255D  \u255A\u2550\u2550\u2550\u255D\u255A\u2550\u255D  \u255A\u2550\u2550\u2550\u255D\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u255D\u255A\u2550\u255D  \u255A\u2550\u255D
 `.trim();
-var Header = () => /* @__PURE__ */ React2.createElement(Box, { flexDirection: "column", alignItems: "flex-start", paddingBottom: 1 }, /* @__PURE__ */ React2.createElement(Gradient, { name: "morning" }, /* @__PURE__ */ React2.createElement(Text2, { bold: true }, HEADER_ASCII)), /* @__PURE__ */ React2.createElement(Box, { marginTop: 1, width: 80, justifyContent: "flex-start" }, /* @__PURE__ */ React2.createElement(Text2, { color: "gray", dimColor: true, italic: true, wrap: "wrap" }, "An AI platform that analyzes real customer complaints to reveal unmet service demand")));
+var Header = () => {
+  const headerLines = HEADER_ASCII.split("\n");
+  return /* @__PURE__ */ React2.createElement(Box, { flexDirection: "column", alignItems: "flex-start", paddingBottom: 1 }, /* @__PURE__ */ React2.createElement(Box, { flexDirection: "column" }, /* @__PURE__ */ React2.createElement(Text2, { bold: true, color: "#023e7d" }, headerLines[0]), /* @__PURE__ */ React2.createElement(Text2, { bold: true, color: "#023e7d" }, headerLines[1]), /* @__PURE__ */ React2.createElement(Text2, { bold: true, color: "#0353a4" }, headerLines[2]), /* @__PURE__ */ React2.createElement(Text2, { bold: true, color: "#0353a4" }, headerLines[3]), /* @__PURE__ */ React2.createElement(Text2, { bold: true, color: "#0466c8" }, headerLines[4]), /* @__PURE__ */ React2.createElement(Text2, { bold: true, color: "#0466c8" }, headerLines[5])), /* @__PURE__ */ React2.createElement(Box, { marginTop: 1, width: 80, justifyContent: "flex-start" }, /* @__PURE__ */ React2.createElement(Text2, { color: "gray", dimColor: true, italic: true, wrap: "wrap" }, "An AI platform that analyzes real customer complaints to reveal unmet service demand")));
+};
 var ChatHistory = ({ history }) => /* @__PURE__ */ React2.createElement(Box, { flexDirection: "column", paddingBottom: 1 }, history.map((message, index) => /* @__PURE__ */ React2.createElement(Text2, { key: index }, message)));
 var InputBox = ({ value }) => {
   const parts = value.split(/(@\S+)/);

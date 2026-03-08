@@ -20,21 +20,27 @@ const HEADER_ASCII = `
    ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
 `.trim();
 
-const Header = () => (
-    <Box flexDirection="column" alignItems="flex-start" paddingBottom={1}>
-        <Gradient name="morning">
-            <Text bold>
-                {HEADER_ASCII}
-            </Text>
-        </Gradient>
-        
-        <Box marginTop={1} width={80} justifyContent="flex-start">
-            <Text color="gray" dimColor italic wrap="wrap">
-               An AI platform that analyzes real customer complaints to reveal unmet service demand
-            </Text>
+const Header = () => {
+    const headerLines = HEADER_ASCII.split('\n');
+    return (
+        <Box flexDirection="column" alignItems="flex-start" paddingBottom={1}>
+            <Box flexDirection="column">
+                <Text bold color="#023e7d">{headerLines[0]}</Text>
+                <Text bold color="#023e7d">{headerLines[1]}</Text>
+                <Text bold color="#0353a4">{headerLines[2]}</Text>
+                <Text bold color="#0353a4">{headerLines[3]}</Text>
+                <Text bold color="#0466c8">{headerLines[4]}</Text>
+                <Text bold color="#0466c8">{headerLines[5]}</Text>
+            </Box>
+            
+            <Box marginTop={1} width={80} justifyContent="flex-start">
+                <Text color="gray" dimColor italic wrap="wrap">
+                   An AI platform that analyzes real customer complaints to reveal unmet service demand
+                </Text>
+            </Box>
         </Box>
-    </Box>
-);
+    );
+};
 
 interface ChatHistoryProps {
 	history: string[];
