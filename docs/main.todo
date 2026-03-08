@@ -8,8 +8,7 @@ Data Ingestion and Collection:
 
 Data Preprocessing & NLP Signal Extraction:
      ✔ Preprocess data for normalisation and removal of irrelevant information (Filtering System) @done(26-02-11 19:11)
-     ⏳ Remove spams, duplicates, low-signal reviews @inprogress(26-03-08 12:08)
-     ⏳ Pattern Grouping and Frequency Weighting for all collected reviews @inprogress(26-03-08 12:08)
+     ✔ Remove spams, duplicates, low-signal reviews @done(26-03-08 12:29)
      ☐ Importance score rating and Intent scoring with language patterns
      ☐ Use NLP or LLMs for Pain Point and market gap detection using language patterns
 
@@ -23,3 +22,4 @@ User Experience & Feature Updates :
      ✔ Update the agent's intent-extraction @done(26-03-01 21:32)
      ✔ Update reviews extracted response for better comprehensibility @done(26-03-01 21:37)
      ✔ Add Agentic Logs for the on going process & agent tool call @done(26-03-01 21:52)
+     ☐ Update Agent Response Structure for better markdown styling

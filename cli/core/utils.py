@@ -394,6 +394,8 @@ def filter_reviews(reviews, min_word_count=5):
     eprint(f"Filtering complete. Filtered count: {len(unique_reviews)}")
     return unique_reviews
 
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scrape Google Maps reviews for a given search query.")
     parser.add_argument("search_query", help="The search query for Google Maps (e.g., 'ramen in san francisco').")

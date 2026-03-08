@@ -2646,34 +2646,34 @@ async function analyzeReviews(reviews) {
 Analyze the following businesses and their reviews:
 ${businessesBlock}
 
-Provide a comprehensive analysis in JSON format. The JSON object should have the following structure:
+For each business, provide:
+- A concise summary
+- Key positive remarks
+- Actionable complaints with frustration intensity (low, medium, or high)
+- Any detected buying intent
+
+Return your analysis as a single JSON object with a top-level key "businesses" which is an array of objects, one per business. Your entire response must be only the raw JSON object, with no markdown formatting or other text.
+
+Example JSON structure:
 {
-  "overall_summary": "A high-level summary of common themes, strengths, and weaknesses observed across all businesses. Highlight any significant trends or outliers.",
   "businesses": [
     {
       "business_name": "Example Business",
-      "summary": "A concise summary of the reviews for this specific business, touching on overall sentiment and key aspects.",
-      "positive_remarks": [
-        "Clearly articulated positive point 1 (e.g., 'fast service', 'friendly staff').",
-        "Clearly articulated positive point 2."
-      ],
+      "summary": "Overall summary of the reviews for this business.",
+      "positive_remarks": ["Key positive point 1.", "Key positive point 2."],
       "actionable_complaints": [
         {
-          "complaint": "Specific, actionable complaint (e.g., 'long wait times', 'unclear pricing').",
-          "frustration_intensity": "low" | "medium" | "high",
-          "impact": "brief description of the negative impact (e.g., 'customers left frustrated', 'lost sales')."
+          "complaint": "Specific complaint that the business can act on.",
+          "frustration_intensity": "low"
         }
       ],
       "buying_intent": {
-        "detected": true | false,
-        "explanation": "If true, explain why buying intent was detected from the reviews (e.g., 'customers asking about loyalty programs', 'desire for repeat purchases')."
+        "detected": false,
+        "explanation": "If true, explain why buying intent was detected."
       }
     }
-  ],
-  "recommendations": "Based on the overall analysis, provide strategic recommendations for businesses in this market segment to improve customer satisfaction and capture unmet demand."
+  ]
 }
-
-Ensure your entire response is only the raw JSON object, with no markdown formatting or other extraneous text.
 `;
   let fullAnalysisOutput = "--- AI-Powered Review Analysis ---\n";
   try {
@@ -2687,10 +2687,6 @@ Ensure your entire response is only the raw JSON object, with no markdown format
       return fullAnalysisOutput + `
   AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`;
     }
-    fullAnalysisOutput += `
-Overall Summary:
-  ${analysisJson.overall_summary || "N/A"}
-`;
     const businesses = analysisJson.businesses || [];
     if (businesses.length === 0) {
       return fullAnalysisOutput + `
@@ -2703,12 +2699,8 @@ Overall Summary:
       fullAnalysisOutput += `  Summary: ${business.summary || "N/A"}
 `;
       if (business.positive_remarks && business.positive_remarks.length > 0) {
-        fullAnalysisOutput += `  Positive Remarks:
+        fullAnalysisOutput += `  Positive Remarks: ${business.positive_remarks.join(", ")}
 `;
-        business.positive_remarks.forEach((remark, idx) => {
-          fullAnalysisOutput += `    - ${remark}
-`;
-        });
       }
       if (business.actionable_complaints && business.actionable_complaints.length > 0) {
         fullAnalysisOutput += `  Actionable Complaints:
@@ -2716,10 +2708,6 @@ Overall Summary:
         business.actionable_complaints.forEach((comp, idx) => {
           fullAnalysisOutput += `    ${idx + 1}. ${comp.complaint} (Frustration: ${comp.frustration_intensity || "N/A"})
 `;
-          if (comp.impact) {
-            fullAnalysisOutput += `       Impact: ${comp.impact}
-`;
-          }
         });
       }
       if (business.buying_intent && business.buying_intent.detected) {
@@ -2729,12 +2717,6 @@ Overall Summary:
         fullAnalysisOutput += `  Buying Intent Detected: No
 `;
       }
-    }
-    if (analysisJson.recommendations) {
-      fullAnalysisOutput += `
-Strategic Recommendations:
-  ${analysisJson.recommendations}
-`;
     }
   } catch (error) {
     fullAnalysisOutput += `
