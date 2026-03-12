@@ -23,3 +23,15 @@ User Experience & Feature Updates :
      ✔ Update reviews extracted response for better comprehensibility @done(26-03-01 21:37)
      ✔ Add Agentic Logs for the on going process & agent tool call @done(26-03-01 21:52)
      ⏳ Update Agent Response Structure for better markdown styling @inprogress(26-03-08 12:33)
+
+Direct Competitor Analysis:
+     ☐ Develop/adapt scraping module for specific competitor reviews
+     ☐ Function to fetch and store reviews for a single competitor via scraping
+     ☐ Run existing NLP pipeline on competitor-specific review data
+     ☐ Format and display competitor weakness report
+
+Automated Ad Copy Generation:
+     ☐ Create LLM prompt templates for ad copy (Google, Facebook)
+     ☐ Create LLM prompt templates for landing page content
+     ☐ Agent tool to trigger content generation from service gap data
+     ☐ Present generated ad/web content to the user for copy-pasting
