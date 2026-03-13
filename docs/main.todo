@@ -3,7 +3,7 @@ Data Ingestion and Collection:
      ✔ Improve performance for Google Reviews Endpoint @done(26-01-30 18:31)
      ☐ Experimental Reddit Scanner module for market gaps
      ✔ Reviews Filtering system for only bad reviews/negative reviews @done(26-03-01 21:54)
-     ⏳ Experiment with large-scale reviews extraction through google (stress test) @inprogress(26-03-08 12:05)
+     ✔ Experiment with large-scale reviews extraction through google (stress test) @done(26-03-13 20:10)
      ☐ Temporary Market Research Cache Module for LLM prompting
 
 Data Preprocessing & NLP Signal Extraction:
@@ -23,6 +23,7 @@ User Experience & Feature Updates :
      ✔ Update reviews extracted response for better comprehensibility @done(26-03-01 21:37)
      ✔ Add Agentic Logs for the on going process & agent tool call @done(26-03-01 21:52)
      ✔ Update Agent Response Structure for better markdown styling @done(26-03-13 20:01)
+     ⏳ Update LLM module for regional vertex AI endpoints @inprogress(26-03-13 20:11)
 
 Direct Competitor Analysis:
      ☐ Develop/adapt scraping module for specific competitor reviews

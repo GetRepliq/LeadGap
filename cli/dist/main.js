@@ -38708,6 +38708,27 @@ var GoogleGenerativeAI = class {
 // core/agent.js
 var import_cli_table3 = __toESM(require_cli_table3(), 1);
 var GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+var GEMINI_REGION = process.env.GEMINI_REGION;
+var REGIONAL_BASE_URLS = {
+  "us-central1": "https://us-central1-aiplatform.googleapis.com",
+  "us-east4": "https://us-east4-aiplatform.googleapis.com",
+  "europe-west4": "https://europe-west4-aiplatform.googleapis.com",
+  "asia-southeast1": "https://asia-southeast1-aiplatform.googleapis.com"
+};
+function buildGenAI() {
+  if (GEMINI_REGION) {
+    const baseUrl = REGIONAL_BASE_URLS[GEMINI_REGION];
+    if (!baseUrl) {
+      console.warn(
+        `[agent] Unknown GEMINI_REGION "${GEMINI_REGION}". Valid options: ${Object.keys(REGIONAL_BASE_URLS).join(", ")}. Falling back to default global endpoint.`
+      );
+      return new GoogleGenerativeAI(GEMINI_API_KEY);
+    }
+    console.log(`[agent] Routing requests to regional endpoint: ${baseUrl} (${GEMINI_REGION})`);
+    return new GoogleGenerativeAI(GEMINI_API_KEY, { baseUrl });
+  }
+  return new GoogleGenerativeAI(GEMINI_API_KEY);
+}
 async function analyzeReviews(reviews) {
   if (!GEMINI_API_KEY) {
     return "ERROR: GEMINI_API_KEY not found. Please ensure it is set in your .env file.";
@@ -38715,7 +38736,7 @@ async function analyzeReviews(reviews) {
   if (!reviews || reviews.length === 0) {
     return "No reviews were provided to analyze.";
   }
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const genAI = buildGenAI();
   const model = genAI.getGenerativeModel({
     model: "models/gemini-flash-latest",
     generationConfig: {
@@ -38862,7 +38883,7 @@ async function classifyIntent(command) {
   if (!GEMINI_API_KEY) {
     return { intent: "error", detail: "GEMINI_API_KEY not found." };
   }
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const genAI = buildGenAI();
   const model = genAI.getGenerativeModel({
     model: "models/gemini-flash-latest",
     generationConfig: {
