@@ -5,15 +5,12 @@ import Table from 'cli-table3';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // --- Regional Server Configuration ---
-// Set GEMINI_REGION in .env to route to specific regional endpoint
-// Available regions (Vertex AI / Google AI regional endpoints):
-//   us-central1     → Iowa, USA          ← recommended off-peak alternative
+// Available regions:
+//   us-central1     → Iowa, USA
 //   us-east4        → Virginia, USA
 //   europe-west4    → Netherlands
 //   asia-southeast1 → Singapore
-
-
-const GEMINI_REGION = process.env.GEMINI_REGION;
+//   (null)          → Global default endpoint (generativelanguage.googleapis.com)
 
 const REGIONAL_BASE_URLS = {
   "us-central1":     "https://us-central1-aiplatform.googleapis.com",
@@ -22,26 +19,94 @@ const REGIONAL_BASE_URLS = {
   "asia-southeast1": "https://asia-southeast1-aiplatform.googleapis.com",
 };
 
+// All regions + null (global). Shuffled at startup to distribute load
+// across instances rather than everyone piling onto the same fallback
+const ALL_REGIONS = [null, ...Object.keys(REGIONAL_BASE_URLS)];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Session-level active region — starts from .env preference if set, else null (global).
+// Updated to whichever region last succeeded, so subsequent calls skip already-failing regions.
+let activeRegion = process.env.GEMINI_REGION || null;
+
+// Pre-shuffled fallback order for this process lifetime.
+const SHUFFLED_FALLBACKS = shuffleArray(ALL_REGIONS);
+
 /**
- * Builds a GoogleGenerativeAI instance, optionally pointed at a regional endpoint.
- * When GEMINI_REGION is set, requests are routed to that region's servers instead
- * of the shared global endpoint — handy for avoiding demand spikes.
+ * Returns the ordered list of regions to try for a given call:
+ * [activeRegion, ...all others in shuffled order]
  */
-function buildGenAI() {
-  if (GEMINI_REGION) {
-    const baseUrl = REGIONAL_BASE_URLS[GEMINI_REGION];
-    if (!baseUrl) {
-      console.warn(
-        `[agent] Unknown GEMINI_REGION "${GEMINI_REGION}". ` +
-        `Valid options: ${Object.keys(REGIONAL_BASE_URLS).join(', ')}. ` +
-        `Falling back to default global endpoint.`
-      );
-      return new GoogleGenerativeAI(GEMINI_API_KEY);
-    }
-    console.log(`[agent] Routing requests to regional endpoint: ${baseUrl} (${GEMINI_REGION})`);
+function getRegionQueue() {
+  return [activeRegion, ...SHUFFLED_FALLBACKS.filter(r => r !== activeRegion)];
+}
+
+/**
+ * Builds a GoogleGenerativeAI instance pointed at the given region.
+ * Pass null to use the global default endpoint.
+ */
+function buildGenAIForRegion(region) {
+  if (region) {
+    const baseUrl = REGIONAL_BASE_URLS[region];
+    console.log(`[agent] Routing to regional endpoint: ${baseUrl} (${region})`);
     return new GoogleGenerativeAI(GEMINI_API_KEY, { baseUrl });
   }
+  console.log(`[agent] Routing to global endpoint.`);
   return new GoogleGenerativeAI(GEMINI_API_KEY);
+}
+
+/**
+ * Returns true if the error is a retryable 503 overload, false for anything
+ * else (auth errors, bad requests, etc.) that shouldn't trigger a region switch.
+ */
+function is503(error) {
+  return (
+    error?.message?.includes('503') ||
+    error?.message?.includes('Service Unavailable') ||
+    error?.message?.includes('high demand')
+  );
+}
+
+/**
+ * Wraps a model-using function with automatic region fallback on 503.
+ * `apiFn` receives a configured GoogleGenerativeAI instance and should return a promise.
+ * On success the winning region is remembered for the session.
+ */
+async function withRegionFallback(apiFn) {
+  const queue = getRegionQueue();
+
+  for (const region of queue) {
+    const regionLabel = region ?? 'global';
+    try {
+      const genAI = buildGenAIForRegion(region);
+      const result = await apiFn(genAI);
+      // Remember the winner so next call starts here
+      if (activeRegion !== region) {
+        console.log(`[agent] Region "${regionLabel}" succeeded — pinning for this session.`);
+        activeRegion = region;
+      }
+      return result;
+    } catch (error) {
+      if (is503(error)) {
+        console.warn(`[agent] Region "${regionLabel}" returned 503 — trying next region...`);
+        // Small pause before hitting the next endpoint
+        await new Promise(res => setTimeout(res, 600));
+        continue;
+      }
+      // Non-retryable error — rethrow immediately
+      throw error;
+    }
+  }
+
+  throw new Error(
+    '[agent] All regions returned 503. Gemini is experiencing widespread issues. Please try again later.'
+  );
 }
 
 /**
@@ -58,14 +123,6 @@ export async function analyzeReviews(reviews) {
   if (!reviews || reviews.length === 0) {
     return "No reviews were provided to analyze.";
   }
-
-  const genAI = buildGenAI();
-  const model = genAI.getGenerativeModel({
-    model: "models/gemini-flash-latest",
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
 
   const reviewsByBusiness = reviews.reduce((acc, review) => {
     const businessName = review.business_name || 'Unknown Business';
@@ -91,8 +148,8 @@ Analyze the following businesses and their reviews:
 ${businessesBlock}
 
 For each business, provide:
-- A concise summary
-- Key positive remarks
+- A concise summary (no more than 10 words)
+- Key positive remarks (no more than 10 words)
 - Actionable complaints with frustration intensity (low, medium, or high)
 - Any detected buying intent
 
@@ -123,9 +180,14 @@ Example JSON structure:
   let fullAnalysisOutput = "--- AI-Powered Review Analysis ---\n\n";
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const llmText = response.text();
+    const llmText = await withRegionFallback(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "models/gemini-flash-latest",
+        generationConfig: { responseMimeType: "application/json" },
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
 
     let analysisJson;
     try {
@@ -223,14 +285,6 @@ export async function classifyIntent(command) {
     return { intent: "error", detail: "GEMINI_API_KEY not found." };
   }
 
-  const genAI = buildGenAI();
-  const model = genAI.getGenerativeModel({
-    model: "models/gemini-flash-latest",
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
-
   const prompt = `You are an intent classification AI. You need to determine if the user's goal is to 'extract reviews' for a specific entity.
 
   The user's command is: "${command}"
@@ -267,9 +321,14 @@ export async function classifyIntent(command) {
   `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const llmText = response.text();
+    const llmText = await withRegionFallback(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "models/gemini-flash-latest",
+        generationConfig: { responseMimeType: "application/json" },
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
     return JSON.parse(llmText);
   } catch (error) {
     console.error('Error during intent classification:', error);

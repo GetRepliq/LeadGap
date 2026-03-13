@@ -38708,26 +38708,62 @@ var GoogleGenerativeAI = class {
 // core/agent.js
 var import_cli_table3 = __toESM(require_cli_table3(), 1);
 var GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-var GEMINI_REGION = process.env.GEMINI_REGION;
 var REGIONAL_BASE_URLS = {
   "us-central1": "https://us-central1-aiplatform.googleapis.com",
   "us-east4": "https://us-east4-aiplatform.googleapis.com",
   "europe-west4": "https://europe-west4-aiplatform.googleapis.com",
   "asia-southeast1": "https://asia-southeast1-aiplatform.googleapis.com"
 };
-function buildGenAI() {
-  if (GEMINI_REGION) {
-    const baseUrl = REGIONAL_BASE_URLS[GEMINI_REGION];
-    if (!baseUrl) {
-      console.warn(
-        `[agent] Unknown GEMINI_REGION "${GEMINI_REGION}". Valid options: ${Object.keys(REGIONAL_BASE_URLS).join(", ")}. Falling back to default global endpoint.`
-      );
-      return new GoogleGenerativeAI(GEMINI_API_KEY);
-    }
-    console.log(`[agent] Routing requests to regional endpoint: ${baseUrl} (${GEMINI_REGION})`);
+var ALL_REGIONS = [null, ...Object.keys(REGIONAL_BASE_URLS)];
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+var activeRegion = process.env.GEMINI_REGION || null;
+var SHUFFLED_FALLBACKS = shuffleArray(ALL_REGIONS);
+function getRegionQueue() {
+  return [activeRegion, ...SHUFFLED_FALLBACKS.filter((r) => r !== activeRegion)];
+}
+function buildGenAIForRegion(region) {
+  if (region) {
+    const baseUrl = REGIONAL_BASE_URLS[region];
+    console.log(`[agent] Routing to regional endpoint: ${baseUrl} (${region})`);
     return new GoogleGenerativeAI(GEMINI_API_KEY, { baseUrl });
   }
+  console.log(`[agent] Routing to global endpoint.`);
   return new GoogleGenerativeAI(GEMINI_API_KEY);
+}
+function is503(error) {
+  return error?.message?.includes("503") || error?.message?.includes("Service Unavailable") || error?.message?.includes("high demand");
+}
+async function withRegionFallback(apiFn) {
+  const queue = getRegionQueue();
+  for (const region of queue) {
+    const regionLabel = region ?? "global";
+    try {
+      const genAI = buildGenAIForRegion(region);
+      const result = await apiFn(genAI);
+      if (activeRegion !== region) {
+        console.log(`[agent] Region "${regionLabel}" succeeded \u2014 pinning for this session.`);
+        activeRegion = region;
+      }
+      return result;
+    } catch (error) {
+      if (is503(error)) {
+        console.warn(`[agent] Region "${regionLabel}" returned 503 \u2014 trying next region...`);
+        await new Promise((res) => setTimeout(res, 600));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error(
+    "[agent] All regions returned 503. Gemini is experiencing widespread issues. Please try again later."
+  );
 }
 async function analyzeReviews(reviews) {
   if (!GEMINI_API_KEY) {
@@ -38736,13 +38772,6 @@ async function analyzeReviews(reviews) {
   if (!reviews || reviews.length === 0) {
     return "No reviews were provided to analyze.";
   }
-  const genAI = buildGenAI();
-  const model = genAI.getGenerativeModel({
-    model: "models/gemini-flash-latest",
-    generationConfig: {
-      responseMimeType: "application/json"
-    }
-  });
   const reviewsByBusiness = reviews.reduce((acc, review) => {
     const businessName = review.business_name || "Unknown Business";
     if (!acc[businessName]) {
@@ -38794,9 +38823,14 @@ Example JSON structure:
 `;
   let fullAnalysisOutput = "--- AI-Powered Review Analysis ---\n\n";
   try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const llmText = response.text();
+    const llmText = await withRegionFallback(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "models/gemini-flash-latest",
+        generationConfig: { responseMimeType: "application/json" }
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
     let analysisJson;
     try {
       analysisJson = JSON.parse(llmText);
@@ -38883,13 +38917,6 @@ async function classifyIntent(command) {
   if (!GEMINI_API_KEY) {
     return { intent: "error", detail: "GEMINI_API_KEY not found." };
   }
-  const genAI = buildGenAI();
-  const model = genAI.getGenerativeModel({
-    model: "models/gemini-flash-latest",
-    generationConfig: {
-      responseMimeType: "application/json"
-    }
-  });
   const prompt = `You are an intent classification AI. You need to determine if the user's goal is to 'extract reviews' for a specific entity.
 
   The user's command is: "${command}"
@@ -38925,9 +38952,14 @@ async function classifyIntent(command) {
   Now, process the user's command.
   `;
   try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const llmText = response.text();
+    const llmText = await withRegionFallback(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "models/gemini-flash-latest",
+        generationConfig: { responseMimeType: "application/json" }
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
     return JSON.parse(llmText);
   } catch (error) {
     console.error("Error during intent classification:", error);
