@@ -4,6 +4,46 @@ import Table from 'cli-table3';
 // --- Gemini API Configuration ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+// --- Regional Server Configuration ---
+// Set GEMINI_REGION in .env to route to specific regional endpoint
+// Available regions (Vertex AI / Google AI regional endpoints):
+//   us-central1     → Iowa, USA          ← recommended off-peak alternative
+//   us-east4        → Virginia, USA
+//   europe-west4    → Netherlands
+//   asia-southeast1 → Singapore
+
+
+const GEMINI_REGION = process.env.GEMINI_REGION;
+
+const REGIONAL_BASE_URLS = {
+  "us-central1":     "https://us-central1-aiplatform.googleapis.com",
+  "us-east4":        "https://us-east4-aiplatform.googleapis.com",
+  "europe-west4":    "https://europe-west4-aiplatform.googleapis.com",
+  "asia-southeast1": "https://asia-southeast1-aiplatform.googleapis.com",
+};
+
+/**
+ * Builds a GoogleGenerativeAI instance, optionally pointed at a regional endpoint.
+ * When GEMINI_REGION is set, requests are routed to that region's servers instead
+ * of the shared global endpoint — handy for avoiding demand spikes.
+ */
+function buildGenAI() {
+  if (GEMINI_REGION) {
+    const baseUrl = REGIONAL_BASE_URLS[GEMINI_REGION];
+    if (!baseUrl) {
+      console.warn(
+        `[agent] Unknown GEMINI_REGION "${GEMINI_REGION}". ` +
+        `Valid options: ${Object.keys(REGIONAL_BASE_URLS).join(', ')}. ` +
+        `Falling back to default global endpoint.`
+      );
+      return new GoogleGenerativeAI(GEMINI_API_KEY);
+    }
+    console.log(`[agent] Routing requests to regional endpoint: ${baseUrl} (${GEMINI_REGION})`);
+    return new GoogleGenerativeAI(GEMINI_API_KEY, { baseUrl });
+  }
+  return new GoogleGenerativeAI(GEMINI_API_KEY);
+}
+
 /**
  * Analyzes an array of review objects using the @google/generative-ai library.
  * All businesses are sent in a single batched API call.
@@ -19,7 +59,7 @@ export async function analyzeReviews(reviews) {
     return "No reviews were provided to analyze.";
   }
 
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const genAI = buildGenAI();
   const model = genAI.getGenerativeModel({
     model: "models/gemini-flash-latest",
     generationConfig: {
@@ -100,9 +140,6 @@ Example JSON structure:
       return fullAnalysisOutput + `\n  AI Analysis: The LLM returned no business data. Raw parsed JSON: ${JSON.stringify(analysisJson)}`;
     }
 
-    // -------------------------------------------------------
-    // SECTION 1: Written detailed breakdown per business
-    // -------------------------------------------------------
     for (const business of businesses) {
       const businessName = business.business_name || 'Unknown';
       const summary = business.summary || 'N/A';
@@ -137,9 +174,6 @@ Example JSON structure:
       fullAnalysisOutput += '\n';
     }
 
-    // -------------------------------------------------------
-    // SECTION 2: Condensed summary table
-    // -------------------------------------------------------
     fullAnalysisOutput += "--- Summary Table ---\n\n";
 
     const terminalWidth = process.stdout.columns || 120;
@@ -189,7 +223,7 @@ export async function classifyIntent(command) {
     return { intent: "error", detail: "GEMINI_API_KEY not found." };
   }
 
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const genAI = buildGenAI();
   const model = genAI.getGenerativeModel({
     model: "models/gemini-flash-latest",
     generationConfig: {
