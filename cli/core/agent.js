@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import Table from 'cli-table3';
 
 // --- Gemini API Configuration ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -18,16 +19,14 @@ export async function analyzeReviews(reviews) {
     return "No reviews were provided to analyze.";
   }
 
-  // Initialize the Google Generative AI client
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({
     model: "models/gemini-flash-latest",
     generationConfig: {
-      responseMimeType: "application/json", // Request JSON output
+      responseMimeType: "application/json",
     },
   });
 
-  // Group reviews by business name for structured processing
   const reviewsByBusiness = reviews.reduce((acc, review) => {
     const businessName = review.business_name || 'Unknown Business';
     if (!acc[businessName]) {
@@ -37,7 +36,6 @@ export async function analyzeReviews(reviews) {
     return acc;
   }, {});
 
-  // --- Build a single batched prompt containing ALL businesses ---
   const businessNames = Object.keys(reviewsByBusiness);
 
   const businessesBlock = businessNames.map((businessName) => {
@@ -82,50 +80,101 @@ Example JSON structure:
 }
 `;
 
-  let fullAnalysisOutput = "--- AI-Powered Review Analysis ---\n";
+  let fullAnalysisOutput = "--- AI-Powered Review Analysis ---\n\n";
 
   try {
     const result = await model.generateContent(prompt);
     const response = result.response;
     const llmText = response.text();
-    
+
     let analysisJson;
     try {
-      // Since we requested JSON output, we can parse it directly
       analysisJson = JSON.parse(llmText);
     } catch (parseError) {
       return fullAnalysisOutput + `\n  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`;
     }
 
-    // --- Format the parsed batch response for each business ---
     const businesses = analysisJson.businesses || [];
 
     if (businesses.length === 0) {
       return fullAnalysisOutput + `\n  AI Analysis: The LLM returned no business data. Raw parsed JSON: ${JSON.stringify(analysisJson)}`;
     }
 
+    // -------------------------------------------------------
+    // SECTION 1: Written detailed breakdown per business
+    // -------------------------------------------------------
     for (const business of businesses) {
-      fullAnalysisOutput += `\n--- Business: ${business.business_name || 'Unknown'} ---\n`;
+      const businessName = business.business_name || 'Unknown';
+      const summary = business.summary || 'N/A';
+      const positiveRemarks = business.positive_remarks || [];
+      const complaints = business.actionable_complaints || [];
+      const buyingIntent = business.buying_intent || {};
 
-      fullAnalysisOutput += `  Summary: ${business.summary || 'N/A'}\n`;
+      fullAnalysisOutput += `--- Business: ${businessName} ---\n`;
+      fullAnalysisOutput += `  Summary: ${summary}\n`;
 
-      if (business.positive_remarks && business.positive_remarks.length > 0) {
-        fullAnalysisOutput += `  Positive Remarks: ${business.positive_remarks.join(', ')}\n`;
+      if (positiveRemarks.length > 0) {
+        fullAnalysisOutput += `  Positive Remarks: ${positiveRemarks.join(', ')}\n`;
+      } else {
+        fullAnalysisOutput += `  Positive Remarks: N/A\n`;
       }
 
-      if (business.actionable_complaints && business.actionable_complaints.length > 0) {
+      if (complaints.length > 0) {
         fullAnalysisOutput += `  Actionable Complaints:\n`;
-        business.actionable_complaints.forEach((comp, idx) => {
+        complaints.forEach((comp, idx) => {
           fullAnalysisOutput += `    ${idx + 1}. ${comp.complaint} (Frustration: ${comp.frustration_intensity || 'N/A'})\n`;
         });
+      } else {
+        fullAnalysisOutput += `  Actionable Complaints: None\n`;
       }
 
-      if (business.buying_intent && business.buying_intent.detected) {
-        fullAnalysisOutput += `  Buying Intent Detected: Yes - ${business.buying_intent.explanation || 'N/A'}\n`;
-      } else if (business.buying_intent && !business.buying_intent.detected) {
+      if (buyingIntent.detected) {
+        fullAnalysisOutput += `  Buying Intent Detected: Yes - ${buyingIntent.explanation || 'N/A'}\n`;
+      } else {
         fullAnalysisOutput += `  Buying Intent Detected: No\n`;
       }
+
+      fullAnalysisOutput += '\n';
     }
+
+    // -------------------------------------------------------
+    // SECTION 2: Condensed summary table
+    // -------------------------------------------------------
+    fullAnalysisOutput += "--- Summary Table ---\n\n";
+
+    const terminalWidth = process.stdout.columns || 120;
+    const tableWidth = Math.min(terminalWidth, 160) - 4;
+
+    const table = new Table({
+      head: ['Business', 'Summary', '# Positives', '# Complaints', 'Top Complaint', 'Buying Intent'],
+      colWidths: [
+        Math.floor(tableWidth * 0.13),
+        Math.floor(tableWidth * 0.25),
+        Math.floor(tableWidth * 0.08),
+        Math.floor(tableWidth * 0.08),
+        Math.floor(tableWidth * 0.30),
+        Math.floor(tableWidth * 0.16),
+      ],
+      wordWrap: true,
+      style: { 'padding-left': 1, 'padding-right': 1, head: ['cyan'] },
+    });
+
+    for (const business of businesses) {
+      const businessName = business.business_name || 'Unknown';
+      const summary = business.summary || 'N/A';
+      const positiveCount = (business.positive_remarks || []).length.toString();
+      const complaintCount = (business.actionable_complaints || []).length.toString();
+
+      const topComplaint = (business.actionable_complaints && business.actionable_complaints.length > 0)
+        ? `${business.actionable_complaints[0].complaint} (${business.actionable_complaints[0].frustration_intensity || 'N/A'})`
+        : 'None';
+
+      const buyingIntentLabel = (business.buying_intent && business.buying_intent.detected) ? 'Yes' : 'No';
+
+      table.push([businessName, summary, positiveCount, complaintCount, topComplaint, buyingIntentLabel]);
+    }
+
+    fullAnalysisOutput += table.toString();
 
   } catch (error) {
     fullAnalysisOutput += `\n  AI Analysis Error: ${error.message}`;
@@ -134,6 +183,7 @@ Example JSON structure:
 
   return fullAnalysisOutput;
 }
+
 export async function classifyIntent(command) {
   if (!GEMINI_API_KEY) {
     return { intent: "error", detail: "GEMINI_API_KEY not found." };

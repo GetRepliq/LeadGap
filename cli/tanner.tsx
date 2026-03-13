@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import React, { useState, useEffect } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
@@ -5,7 +6,7 @@ import Gradient from 'ink-gradient';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import path from 'path';
-import { fileURLToPath } from 'url'; // Added for ESM __dirname equivalent
+import { fileURLToPath } from 'url';
 import { analyzeReviews, classifyIntent } from './core/agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,15 +44,17 @@ const Header = () => {
 };
 
 interface ChatHistoryProps {
-	history: string[];
+    history: { sender: 'user' | 'agent'; content: string }[];
 }
 
 const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => (
-	<Box flexDirection="column" paddingBottom={1}>
-		{history.map((message, index) => (
-			<Text key={index}>{message}</Text>
-		))}
-	</Box>
+    <Box flexDirection="column" paddingBottom={1}>
+        {history.map((message, index) => (
+            <Box key={index} flexDirection="column">
+                <Text>{message.content}</Text>
+            </Box>
+        ))}
+    </Box>
 );
 
 interface InputBoxProps {
@@ -126,7 +129,7 @@ const Processing = () => (
 
 const App = () => {
 	const { exit } = useApp();
-	const [history, setHistory] = useState<string[]>([]);
+	const [history, setHistory] = useState<{ sender: 'user' | 'agent'; content: string }[]>([]);
 	const [inputValue, setInputValue] = useState('');
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 	const [suggestionBoxVisible, setSuggestionBoxVisible] = useState(false);
@@ -152,7 +155,7 @@ const App = () => {
 		setIsProcessing(true);
 		setToolCallStatus([]);
 		setActiveToolCall(null);
-		setHistory(prev => [...prev, `> ${command}`]);
+		setHistory(prev => [...prev, { sender: 'user', content: `> ${command}` }]);
 
 		const { intent, searchQuery, detail } = await classifyIntent(command);
 
@@ -190,25 +193,25 @@ const App = () => {
 						setToolCallStatus(prev => [...prev, `Collected ${numReviews} reviews. Processing...`]);
 						
 						const analysis = await analyzeReviews(reviews);
-						setHistory(prev => [...prev, `Tanner AI:\n${analysis}`]);
+						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI:\n${analysis}` }]);
 						setToolCallStatus(prev => [...prev, `Completed in ${timeTakenString}.`]);
 
 					} catch (e) {
-						setHistory(prev => [...prev, `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}`]);
+						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);
 						setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
 					}
 				} else {
-					setHistory(prev => [...prev, `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}`]);
+					setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}` }]);
 					setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
 				}
 				setIsProcessing(false);
 			});
 		} else if (intent === 'error') {
-			setHistory(prev => [...prev, `Tanner AI: Error: ${detail}`]);
+			setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error: ${detail}` }]);
 			setIsProcessing(false);
 		}
 		else {
-			setHistory(prev => [...prev, `Tanner AI: ${command}`]);
+			setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: ${command}` }]);
 			setIsProcessing(false);
 		}
 	};

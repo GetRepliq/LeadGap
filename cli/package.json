@@ -5,8 +5,8 @@
   "main": "ui.tsx",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "DOTENV_CONFIG_PATH=../.env node -r dotenv/config dist/main.js",
-    "build": "node build.js"
+    "start": "DOTENV_CONFIG_PATH=../.env node dist/main.js",
+    "build": "INK_DEV=false node build.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +22,7 @@
   "homepage": "https://github.com/regional-specter/Harvey#readme",
   "dependencies": {
     "@google/generative-ai": "^0.15.0",
+    "cli-table3": "^0.6.5",
     "dotenv": "^16.4.5",
     "ink": "^6.6.0",
     "ink-gradient": "^3.0.0",
