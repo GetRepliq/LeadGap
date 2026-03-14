@@ -38793,8 +38793,8 @@ Analyze the following businesses and their reviews:
 ${businessesBlock}
 
 For each business, provide:
-- A concise summary
-- Key positive remarks
+- A concise summary (no more than 10 words)
+- Key positive remarks (no more than 10 words)
 - Actionable complaints with frustration intensity (low, medium, or high)
 - Any detected buying intent
 

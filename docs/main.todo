@@ -36,5 +36,5 @@ Direct Competitor Analysis:
 Automated Ad Copy Generation:
      ☐ Create LLM prompt templates for ad copy (Google, Facebook)
      ☐ Create LLM prompt templates for landing page content
-     ☐ Agent tool to trigger content generation from service gap data
+     ⏳ Agent tool to trigger content generation from service gap data @inprogress(26-03-14 16:27)
      ☐ Present generated ad/web content to the user for copy-pasting
