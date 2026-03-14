@@ -7,7 +7,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { analyzeReviews, classifyIntent } from './core/agent.js';
+import { analyzeReviews, classifyIntent, updateMemory } from './core/agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,9 +192,20 @@ const App = () => {
 						const numReviews = reviews.length;
 						setToolCallStatus(prev => [...prev, `Collected ${numReviews} reviews. Processing...`]);
 						
-						const analysis = await analyzeReviews(reviews);
-						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI:\n${analysis}` }]);
-						setToolCallStatus(prev => [...prev, `Completed in ${timeTakenString}.`]);
+						const { formattedAnalysis, rawJson } = await analyzeReviews(reviews);
+						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI:\n${formattedAnalysis}` }]);
+						setToolCallStatus(prev => [...prev, `Analysis completed in ${timeTakenString}.`]);
+
+						if (rawJson) {
+							setToolCallStatus(prev => [...prev, "Syncing to Market Intelligence Cache..."]);
+							updateMemory(rawJson, searchQuery)
+								.then(() => {
+									setToolCallStatus(prev => [...prev, "Cache updated successfully."]);
+								})
+								.catch((err) => {
+									setToolCallStatus(prev => [...prev, `Cache sync failed: ${err.message}`]);
+								});
+						}
 
 					} catch (e) {
 						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);

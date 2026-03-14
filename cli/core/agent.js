@@ -1,5 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Table from 'cli-table3';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // --- Gemini API Configuration ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -118,10 +121,10 @@ async function withRegionFallback(apiFn) {
  */
 export async function analyzeReviews(reviews) {
   if (!GEMINI_API_KEY) {
-    return "ERROR: GEMINI_API_KEY not found. Please ensure it is set in your .env file.";
+    return { formattedAnalysis: "ERROR: GEMINI_API_KEY not found. Please ensure it is set in your .env file.", rawJson: null };
   }
   if (!reviews || reviews.length === 0) {
-    return "No reviews were provided to analyze.";
+    return { formattedAnalysis: "No reviews were provided to analyze.", rawJson: null };
   }
 
   const reviewsByBusiness = reviews.reduce((acc, review) => {
@@ -193,13 +196,19 @@ Example JSON structure:
     try {
       analysisJson = JSON.parse(llmText);
     } catch (parseError) {
-      return fullAnalysisOutput + `\n  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`;
+      return { 
+        formattedAnalysis: fullAnalysisOutput + `\n  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`, 
+        rawJson: null 
+      };
     }
 
     const businesses = analysisJson.businesses || [];
 
     if (businesses.length === 0) {
-      return fullAnalysisOutput + `\n  AI Analysis: The LLM returned no business data. Raw parsed JSON: ${JSON.stringify(analysisJson)}`;
+      return {
+        formattedAnalysis: fullAnalysisOutput + `\n  AI Analysis: The LLM returned no business data. Raw parsed JSON: ${JSON.stringify(analysisJson)}`,
+        rawJson: analysisJson
+      };
     }
 
     for (const business of businesses) {
@@ -272,12 +281,57 @@ Example JSON structure:
 
     fullAnalysisOutput += table.toString();
 
+    return { formattedAnalysis: fullAnalysisOutput, rawJson: analysisJson };
+
   } catch (error) {
     fullAnalysisOutput += `\n  AI Analysis Error: ${error.message}`;
     console.error('Error during batched LLM analysis:', error);
+    return { formattedAnalysis: fullAnalysisOutput, rawJson: null };
   }
+}
 
-  return fullAnalysisOutput;
+/**
+ * Updates market intelligence cache by spawning the memory.py
+ * 
+ * @param {Object} rawAnalysis - The raw JSON analysis from the LLM.
+ * @param {string} searchQuery - The user's original search query.
+ * @returns {Promise<void>}
+ */
+export async function updateMemory(rawAnalysis, searchQuery) {
+  if (!rawAnalysis) return;
+
+  const pythonScriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'memory.py');
+  const payload = JSON.stringify({ analysis: rawAnalysis, query: searchQuery });
+
+  return new Promise((resolve, reject) => {
+    const pythonProcess = spawn('python3', [pythonScriptPath]);
+
+    pythonProcess.stdin.write(payload);
+    pythonProcess.stdin.end();
+
+    let stdoutData = '';
+    let stderrData = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      stdoutData += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      stderrData += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log(`[memory] Cache updated successfully.`);
+        console.log(`[memory] stdout: ${stdoutData.trim()}`);
+        resolve();
+      } else {
+        const errorMsg = `[memory] Error updating cache (exit code ${code}).\nStderr: ${stderrData.trim()}\nStdout: ${stdoutData.trim()}`;
+        console.error(errorMsg);
+        reject(new Error(errorMsg));
+      }
+    });
+  });
 }
 
 export async function classifyIntent(command) {

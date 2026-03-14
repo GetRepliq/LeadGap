@@ -10435,10 +10435,10 @@ var require_react_reconciler_development = __commonJS({
           fiber = fiber.next, id--;
         return fiber;
       }
-      function copyWithSetImpl(obj, path2, index, value) {
-        if (index >= path2.length) return value;
-        var key = path2[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
-        updated[key] = copyWithSetImpl(obj[key], path2, index + 1, value);
+      function copyWithSetImpl(obj, path3, index, value) {
+        if (index >= path3.length) return value;
+        var key = path3[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
+        updated[key] = copyWithSetImpl(obj[key], path3, index + 1, value);
         return updated;
       }
       function copyWithRename(obj, oldPath, newPath) {
@@ -10465,11 +10465,11 @@ var require_react_reconciler_development = __commonJS({
         );
         return updated;
       }
-      function copyWithDeleteImpl(obj, path2, index) {
-        var key = path2[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
-        if (index + 1 === path2.length)
+      function copyWithDeleteImpl(obj, path3, index) {
+        var key = path3[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
+        if (index + 1 === path3.length)
           return isArrayImpl(updated) ? updated.splice(key, 1) : delete updated[key], updated;
-        updated[key] = copyWithDeleteImpl(obj[key], path2, index + 1);
+        updated[key] = copyWithDeleteImpl(obj[key], path3, index + 1);
         return updated;
       }
       function shouldSuspendImpl() {
@@ -23746,29 +23746,29 @@ var require_react_reconciler_development = __commonJS({
       var didWarnAboutNestedUpdates = false;
       var didWarnAboutFindNodeInStrictMode = {};
       var overrideHookState = null, overrideHookStateDeletePath = null, overrideHookStateRenamePath = null, overrideProps = null, overridePropsDeletePath = null, overridePropsRenamePath = null, scheduleUpdate = null, scheduleRetry = null, setErrorHandler = null, setSuspenseHandler = null;
-      overrideHookState = function(fiber, id, path2, value) {
+      overrideHookState = function(fiber, id, path3, value) {
         id = findHook(fiber, id);
-        null !== id && (path2 = copyWithSetImpl(id.memoizedState, path2, 0, value), id.memoizedState = path2, id.baseState = path2, fiber.memoizedProps = assign({}, fiber.memoizedProps), path2 = enqueueConcurrentRenderForLane(fiber, 2), null !== path2 && scheduleUpdateOnFiber(path2, fiber, 2));
+        null !== id && (path3 = copyWithSetImpl(id.memoizedState, path3, 0, value), id.memoizedState = path3, id.baseState = path3, fiber.memoizedProps = assign({}, fiber.memoizedProps), path3 = enqueueConcurrentRenderForLane(fiber, 2), null !== path3 && scheduleUpdateOnFiber(path3, fiber, 2));
       };
-      overrideHookStateDeletePath = function(fiber, id, path2) {
+      overrideHookStateDeletePath = function(fiber, id, path3) {
         id = findHook(fiber, id);
-        null !== id && (path2 = copyWithDeleteImpl(id.memoizedState, path2, 0), id.memoizedState = path2, id.baseState = path2, fiber.memoizedProps = assign({}, fiber.memoizedProps), path2 = enqueueConcurrentRenderForLane(fiber, 2), null !== path2 && scheduleUpdateOnFiber(path2, fiber, 2));
+        null !== id && (path3 = copyWithDeleteImpl(id.memoizedState, path3, 0), id.memoizedState = path3, id.baseState = path3, fiber.memoizedProps = assign({}, fiber.memoizedProps), path3 = enqueueConcurrentRenderForLane(fiber, 2), null !== path3 && scheduleUpdateOnFiber(path3, fiber, 2));
       };
       overrideHookStateRenamePath = function(fiber, id, oldPath, newPath) {
         id = findHook(fiber, id);
         null !== id && (oldPath = copyWithRename(id.memoizedState, oldPath, newPath), id.memoizedState = oldPath, id.baseState = oldPath, fiber.memoizedProps = assign({}, fiber.memoizedProps), oldPath = enqueueConcurrentRenderForLane(fiber, 2), null !== oldPath && scheduleUpdateOnFiber(oldPath, fiber, 2));
       };
-      overrideProps = function(fiber, path2, value) {
-        fiber.pendingProps = copyWithSetImpl(fiber.memoizedProps, path2, 0, value);
+      overrideProps = function(fiber, path3, value) {
+        fiber.pendingProps = copyWithSetImpl(fiber.memoizedProps, path3, 0, value);
         fiber.alternate && (fiber.alternate.pendingProps = fiber.pendingProps);
-        path2 = enqueueConcurrentRenderForLane(fiber, 2);
-        null !== path2 && scheduleUpdateOnFiber(path2, fiber, 2);
+        path3 = enqueueConcurrentRenderForLane(fiber, 2);
+        null !== path3 && scheduleUpdateOnFiber(path3, fiber, 2);
       };
-      overridePropsDeletePath = function(fiber, path2) {
-        fiber.pendingProps = copyWithDeleteImpl(fiber.memoizedProps, path2, 0);
+      overridePropsDeletePath = function(fiber, path3) {
+        fiber.pendingProps = copyWithDeleteImpl(fiber.memoizedProps, path3, 0);
         fiber.alternate && (fiber.alternate.pendingProps = fiber.pendingProps);
-        path2 = enqueueConcurrentRenderForLane(fiber, 2);
-        null !== path2 && scheduleUpdateOnFiber(path2, fiber, 2);
+        path3 = enqueueConcurrentRenderForLane(fiber, 2);
+        null !== path3 && scheduleUpdateOnFiber(path3, fiber, 2);
       };
       overridePropsRenamePath = function(fiber, oldPath, newPath) {
         fiber.pendingProps = copyWithRename(
@@ -36784,8 +36784,8 @@ function Text({ color, backgroundColor, dimColor = false, bold = false, italic =
 }
 
 // node_modules/ink/build/components/ErrorOverview.js
-var cleanupPath = (path2) => {
-  return path2?.replace(`file://${cwd()}/`, "");
+var cleanupPath = (path3) => {
+  return path3?.replace(`file://${cwd()}/`, "");
 };
 var stackUtils = new import_stack_utils.default({
   cwd: cwd(),
@@ -37793,9 +37793,9 @@ var build_default = Spinner;
 
 // tanner.tsx
 import fs2 from "fs";
-import { spawn } from "child_process";
-import path from "path";
-import { fileURLToPath } from "url";
+import { spawn as spawn2 } from "child_process";
+import path2 from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
 
 // node_modules/@google/generative-ai/dist/index.mjs
 var FunctionDeclarationSchemaType;
@@ -38707,6 +38707,9 @@ var GoogleGenerativeAI = class {
 
 // core/agent.js
 var import_cli_table3 = __toESM(require_cli_table3(), 1);
+import { spawn } from "child_process";
+import path from "path";
+import { fileURLToPath } from "url";
 var GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 var REGIONAL_BASE_URLS = {
   "us-central1": "https://us-central1-aiplatform.googleapis.com",
@@ -38767,10 +38770,10 @@ async function withRegionFallback(apiFn) {
 }
 async function analyzeReviews(reviews) {
   if (!GEMINI_API_KEY) {
-    return "ERROR: GEMINI_API_KEY not found. Please ensure it is set in your .env file.";
+    return { formattedAnalysis: "ERROR: GEMINI_API_KEY not found. Please ensure it is set in your .env file.", rawJson: null };
   }
   if (!reviews || reviews.length === 0) {
-    return "No reviews were provided to analyze.";
+    return { formattedAnalysis: "No reviews were provided to analyze.", rawJson: null };
   }
   const reviewsByBusiness = reviews.reduce((acc, review) => {
     const businessName = review.business_name || "Unknown Business";
@@ -38835,13 +38838,19 @@ Example JSON structure:
     try {
       analysisJson = JSON.parse(llmText);
     } catch (parseError) {
-      return fullAnalysisOutput + `
-  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`;
+      return {
+        formattedAnalysis: fullAnalysisOutput + `
+  AI Analysis: Could not parse LLM's JSON response. Raw LLM text: ${llmText}`,
+        rawJson: null
+      };
     }
     const businesses = analysisJson.businesses || [];
     if (businesses.length === 0) {
-      return fullAnalysisOutput + `
-  AI Analysis: The LLM returned no business data. Raw parsed JSON: ${JSON.stringify(analysisJson)}`;
+      return {
+        formattedAnalysis: fullAnalysisOutput + `
+  AI Analysis: The LLM returned no business data. Raw parsed JSON: ${JSON.stringify(analysisJson)}`,
+        rawJson: analysisJson
+      };
     }
     for (const business of businesses) {
       const businessName = business.business_name || "Unknown";
@@ -38906,12 +38915,44 @@ Example JSON structure:
       table.push([businessName, summary, positiveCount, complaintCount, topComplaint, buyingIntentLabel]);
     }
     fullAnalysisOutput += table.toString();
+    return { formattedAnalysis: fullAnalysisOutput, rawJson: analysisJson };
   } catch (error) {
     fullAnalysisOutput += `
   AI Analysis Error: ${error.message}`;
     console.error("Error during batched LLM analysis:", error);
+    return { formattedAnalysis: fullAnalysisOutput, rawJson: null };
   }
-  return fullAnalysisOutput;
+}
+async function updateMemory(rawAnalysis, searchQuery) {
+  if (!rawAnalysis) return;
+  const pythonScriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "memory.py");
+  const payload = JSON.stringify({ analysis: rawAnalysis, query: searchQuery });
+  return new Promise((resolve, reject) => {
+    const pythonProcess = spawn("python3", [pythonScriptPath]);
+    pythonProcess.stdin.write(payload);
+    pythonProcess.stdin.end();
+    let stdoutData = "";
+    let stderrData = "";
+    pythonProcess.stdout.on("data", (data) => {
+      stdoutData += data.toString();
+    });
+    pythonProcess.stderr.on("data", (data) => {
+      stderrData += data.toString();
+    });
+    pythonProcess.on("close", (code) => {
+      if (code === 0) {
+        console.log(`[memory] Cache updated successfully.`);
+        console.log(`[memory] stdout: ${stdoutData.trim()}`);
+        resolve();
+      } else {
+        const errorMsg = `[memory] Error updating cache (exit code ${code}).
+Stderr: ${stderrData.trim()}
+Stdout: ${stdoutData.trim()}`;
+        console.error(errorMsg);
+        reject(new Error(errorMsg));
+      }
+    });
+  });
 }
 async function classifyIntent(command) {
   if (!GEMINI_API_KEY) {
@@ -38968,8 +39009,8 @@ async function classifyIntent(command) {
 }
 
 // tanner.tsx
-var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
+var __filename = fileURLToPath2(import.meta.url);
+var __dirname = path2.dirname(__filename);
 var HEADER_ASCII = `
 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2557 
 \u255A\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557
@@ -39034,9 +39075,9 @@ var App2 = () => {
       const toolStartTime = Date.now();
       setActiveToolCall({ name: "Google Reviews Extraction", query: searchQuery });
       setToolCallStatus((prev) => [...prev, "Initiated."]);
-      const pythonScriptPath = path.join(__dirname, "..", "core", "utils.py");
+      const pythonScriptPath = path2.join(__dirname, "..", "core", "utils.py");
       const pythonArgs = [pythonScriptPath, searchQuery];
-      const pythonProcess = spawn("python3", pythonArgs);
+      const pythonProcess = spawn2("python3", pythonArgs);
       let stdoutData = "";
       let stderrData = "";
       pythonProcess.stdout.on("data", (data) => {
@@ -39056,10 +39097,18 @@ var App2 = () => {
             const reviews = JSON.parse(stdoutData);
             const numReviews = reviews.length;
             setToolCallStatus((prev) => [...prev, `Collected ${numReviews} reviews. Processing...`]);
-            const analysis = await analyzeReviews(reviews);
+            const { formattedAnalysis, rawJson } = await analyzeReviews(reviews);
             setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI:
-${analysis}` }]);
-            setToolCallStatus((prev) => [...prev, `Completed in ${timeTakenString}.`]);
+${formattedAnalysis}` }]);
+            setToolCallStatus((prev) => [...prev, `Analysis completed in ${timeTakenString}.`]);
+            if (rawJson) {
+              setToolCallStatus((prev) => [...prev, "Syncing to Market Intelligence Cache..."]);
+              updateMemory(rawJson, searchQuery).then(() => {
+                setToolCallStatus((prev) => [...prev, "Cache updated successfully."]);
+              }).catch((err) => {
+                setToolCallStatus((prev) => [...prev, `Cache sync failed: ${err.message}`]);
+              });
+            }
           } catch (e) {
             setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);
             setToolCallStatus((prev) => [...prev, `Failed in ${timeTakenString}.`]);
