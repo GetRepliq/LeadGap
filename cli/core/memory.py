@@ -36,7 +36,10 @@ def generate_cache(analysis_data, query):
     """
     Uses Gemini to synthesize the raw analysis into a structured cache template.
     """
+    import time
     print(f"Generating cache for query: {query}")
+    # Small delay to help mitigate race-condition quota issues in rapid testing
+    time.sleep(1)
     try:
         prompt = f"""
         You are an expert market intelligence analyst. Your task is to synthesize the following raw business analysis data into a structured market research cache.
@@ -95,9 +98,8 @@ def generate_cache(analysis_data, query):
         Return ONLY the raw JSON object.
         """
         
-        # Using the new google-genai client syntax
         response = client.models.generate_content(
-            model='gemini-2.0-flash', # Upgraded to 2.0 Flash for better synthesis
+            model='gemini-flash-latest',
             contents=prompt,
             config={
                 'response_mime_type': 'application/json',

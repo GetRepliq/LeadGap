@@ -4,7 +4,7 @@ Data Ingestion and Collection:
      ☐ Experimental Reddit Scanner module for market gaps
      ✔ Reviews Filtering system for only bad reviews/negative reviews @done(26-03-01 21:54)
      ✔ Experiment with large-scale reviews extraction through google (stress test) @done(26-03-13 20:10)
-     ⏳ Temporary Market Research Cache Module for LLM prompting @inprogress(26-03-14 16:34)
+     ✔ Temporary Market Research Cache Module for LLM prompting @done(26-03-15 17:05)
 
 Data Preprocessing & NLP Signal Extraction:
      ✔ Preprocess data for normalisation and removal of irrelevant information (Filtering System) @done(26-02-11 19:11)
