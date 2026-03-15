@@ -351,37 +351,29 @@ export async function classifyIntent(command) {
     return { intent: "error", detail: "GEMINI_API_KEY not found." };
   }
 
-  const prompt = `You are an intent classification AI. You need to determine if the user's goal is to 'extract reviews' for a specific entity.
+  const prompt = `You are an intent classification AI. You need to determine the user's goal.
+  
+  Possible intents:
+  1. "extract_reviews": User wants to find or analyze reviews for a business or niche.
+  2. "generate_content": User wants to create marketing materials, ad copy, or content based on previous research.
+  3. "other": General conversation or unknown requests.
 
   The user's command is: "${command}"
 
-  Your task is to respond with a JSON object that has two fields:
-  1. "intent": This should be either "extract_reviews" or "other".
-  2. "searchQuery": If the intent is "extract_reviews", this field should contain the specific topic or entity the user wants to find reviews for. If the intent is "other", this field should be null.
+  Your task is to respond with a JSON object:
+  {
+    "intent": "extract_reviews" | "generate_content" | "other",
+    "searchQuery": "the topic/entity for reviews (null if not extract_reviews)",
+    "contentRequest": "description of content to generate (null if not generate_content)"
+  }
 
   Example 1:
-  User command: "Can you find reviews for the new coffee shop on Main Street?"
-  Your JSON response:
-  {
-    "intent": "extract_reviews",
-    "searchQuery": "the new coffee shop on Main Street"
-  }
+  User: "Find reviews for plumbers in Austin"
+  Response: { "intent": "extract_reviews", "searchQuery": "plumbers in Austin", "contentRequest": null }
 
   Example 2:
-  User command: "hello, how are you?"
-  Your JSON response:
-  {
-    "intent": "other",
-    "searchQuery": null
-  }
-
-  Example 3:
-  User command: "show me what people are saying about 'Global Pizzeria'"
-  Your JSON response:
-  {
-    "intent": "extract_reviews",
-    "searchQuery": "Global Pizzeria"
-  }
+  User: "Write me 2 Facebook ads based on the research"
+  Response: { "intent": "generate_content", "searchQuery": null, "contentRequest": "2 Facebook ads" }
 
   Now, process the user's command.
   `;
@@ -399,5 +391,61 @@ export async function classifyIntent(command) {
   } catch (error) {
     console.error('Error during intent classification:', error);
     return { intent: "error", detail: "Failed to classify intent." };
+  }
+}
+
+/**
+ * Generates marketing content based on cached market intelligence.
+ * 
+ * @param {string} request - The user's specific content request.
+ * @returns {Promise<string>} The generated content or an error message.
+ */
+export async function generateMarketingContent(request) {
+  if (!GEMINI_API_KEY) return "Error: API key missing.";
+
+  const cachePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'market_info.json');
+  
+  if (!fs.existsSync(cachePath)) {
+    return "No market research found. Please run a review extraction first (e.g., '@search plumbers in Austin') to build the intelligence cache.";
+  }
+
+  let cacheData;
+  try {
+    const rawCache = fs.readFileSync(cachePath, 'utf8');
+    if (!rawCache || rawCache.trim() === "") throw new Error("Empty cache");
+    cacheData = JSON.parse(rawCache);
+  } catch (e) {
+    return "The market intelligence cache is empty or corrupted. Please perform fresh research.";
+  }
+
+  const prompt = `You are an expert direct-response copywriter. Use the following Market Intelligence Cache to fulfill the user's request.
+
+MARKET INTELLIGENCE CACHE:
+${JSON.stringify(cacheData, null, 2)}
+
+USER REQUEST:
+"${request}"
+
+Your task:
+1. Verify if the cache is relevant to the request. If not, politely explain what niche the cache currently covers.
+2. If relevant, generate exactly what the user asked for (e.g., 2 ad copies).
+3. Use the "core_pain_points" and "unmet_demands" from the cache to make the copy highly persuasive and targeted.
+4. Focus on the "proposed_solutions" from the "opportunity_gaps" section.
+
+Format the output clearly for a terminal display. Use bold headers and bullet points.
+`;
+
+  try {
+    const content = await withRegionFallback(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "models/gemini-flash-latest",
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
+    return content;
+  } catch (error) {
+    console.error('Error generating content:', error);
+    return `Error generating content: ${error.message}`;
   }
 }

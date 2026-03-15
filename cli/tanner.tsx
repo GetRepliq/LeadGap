@@ -7,7 +7,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { analyzeReviews, classifyIntent, updateMemory } from './core/agent.js';
+import { analyzeReviews, classifyIntent, updateMemory, generateMarketingContent } from './core/agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -157,7 +157,7 @@ const App = () => {
 		setActiveToolCall(null);
 		setHistory(prev => [...prev, { sender: 'user', content: `> ${command}` }]);
 
-		const { intent, searchQuery, detail } = await classifyIntent(command);
+		const { intent, searchQuery, contentRequest, detail } = await classifyIntent(command);
 
 		if (intent === 'extract_reviews' && searchQuery) {
 			const toolStartTime = Date.now();
@@ -217,6 +217,14 @@ const App = () => {
 				}
 				setIsProcessing(false);
 			});
+		} else if (intent === 'generate_content' && contentRequest) {
+			setActiveToolCall({ name: "Generating Marketing Content", query: contentRequest });
+			setToolCallStatus(prev => [...prev, "Reading cache..."]);
+			
+			const content = await generateMarketingContent(contentRequest);
+			setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI:\n${content}` }]);
+			setToolCallStatus(prev => [...prev, "Content generated successfully."]);
+			setIsProcessing(false);
 		} else if (intent === 'error') {
 			setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error: ${detail}` }]);
 			setIsProcessing(false);
