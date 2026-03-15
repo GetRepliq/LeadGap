@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from pathlib import Path
 import traceback
@@ -29,7 +29,8 @@ if not GEMINI_API_KEY:
     print(f"Error: GEMINI_API_KEY not found in environment. Available keys: {available_keys}")
     sys.exit(1)
 
-genai.configure(api_key=GEMINI_API_KEY)
+# Initialize the new GenAI client
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 def generate_cache(analysis_data, query):
     """
@@ -37,8 +38,6 @@ def generate_cache(analysis_data, query):
     """
     print(f"Generating cache for query: {query}")
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash-latest', generation_config={"response_mime_type": "application/json"})
-        
         prompt = f"""
         You are an expert market intelligence analyst. Your task is to synthesize the following raw business analysis data into a structured market research cache.
         
@@ -96,7 +95,16 @@ def generate_cache(analysis_data, query):
         Return ONLY the raw JSON object.
         """
         
-        response = model.generate_content(prompt)
+        # Using the new google-genai client syntax
+        response = client.models.generate_content(
+            model='gemini-2.0-flash', # Upgraded to 2.0 Flash for better synthesis
+            contents=prompt,
+            config={
+                'response_mime_type': 'application/json',
+            }
+        )
+        
+        # The new SDK returns the response in a different structure
         return json.loads(response.text)
     except Exception as e:
         print(f"Error generating cache with Gemini: {e}")
@@ -125,17 +133,17 @@ def main():
         new_cache = generate_cache(analysis_data, query)
         if not new_cache:
             print("Failed to generate cache (Gemini returned None).")
-            return
+            sys.exit(1)
 
-        # Path to the cache file
-        data_dir = Path(__file__).parent.parent / "data"
+        # Path to the cache file - resolving to absolute path
+        data_dir = Path(__file__).parent.parent.resolve() / "data"
         cache_file = data_dir / "market_info.json"
 
         # Ensure directory exists
         print(f"Ensuring directory exists: {data_dir}")
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write to file (for now, we'll just overwrite or you can implement merging logic)
+        # Write to file
         print(f"Writing to cache file: {cache_file}")
         with open(cache_file, "w") as f:
             json.dump(new_cache, f, indent=2)
@@ -145,10 +153,11 @@ def main():
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON input: {e}")
         traceback.print_exc()
+        sys.exit(1)
     except Exception as e:
         print(f"An error occurred in memory.py: {e}")
         traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
-

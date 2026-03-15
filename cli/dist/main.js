@@ -37792,7 +37792,7 @@ function Spinner({ type = "dots" }) {
 var build_default = Spinner;
 
 // tanner.tsx
-import fs2 from "fs";
+import fs3 from "fs";
 import { spawn as spawn2 } from "child_process";
 import path2 from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
@@ -38710,6 +38710,7 @@ var import_cli_table3 = __toESM(require_cli_table3(), 1);
 import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs2 from "fs";
 var GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 var REGIONAL_BASE_URLS = {
   "us-central1": "https://us-central1-aiplatform.googleapis.com",
@@ -38925,7 +38926,13 @@ Example JSON structure:
 }
 async function updateMemory(rawAnalysis, searchQuery) {
   if (!rawAnalysis) return;
-  const pythonScriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "memory.py");
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const pythonScriptPath = path.resolve(currentDir, "..", "core", "memory.py");
+  if (!fs2.existsSync(pythonScriptPath)) {
+    const errorMsg = `[memory] Error: Python script not found at ${pythonScriptPath}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
   const payload = JSON.stringify({ analysis: rawAnalysis, query: searchQuery });
   return new Promise((resolve, reject) => {
     const pythonProcess = spawn("python3", [pythonScriptPath]);
@@ -39057,7 +39064,7 @@ var App2 = () => {
   const [toolCallStatus, setToolCallStatus] = (0, import_react27.useState)([]);
   (0, import_react27.useEffect)(() => {
     if (suggestionBoxVisible) {
-      fs2.readdir(process.cwd(), (err, files) => {
+      fs3.readdir(process.cwd(), (err, files) => {
         if (err) {
         } else {
           setSuggestions(files);

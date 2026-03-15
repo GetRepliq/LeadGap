@@ -3,6 +3,7 @@ import Table from 'cli-table3';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 // --- Gemini API Configuration ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -300,7 +301,18 @@ Example JSON structure:
 export async function updateMemory(rawAnalysis, searchQuery) {
   if (!rawAnalysis) return;
 
-  const pythonScriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'memory.py');
+  // The running file is dist/main.js
+  // The python script is core/memory.py
+  // So we go up one directory from the current file (dist/), then into core/
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const pythonScriptPath = path.resolve(currentDir, '..', 'core', 'memory.py');
+
+  if (!fs.existsSync(pythonScriptPath)) {
+    const errorMsg = `[memory] Error: Python script not found at ${pythonScriptPath}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
   const payload = JSON.stringify({ analysis: rawAnalysis, query: searchQuery });
 
   return new Promise((resolve, reject) => {
