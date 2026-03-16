@@ -7,7 +7,14 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { marked } from 'marked';
+import TerminalRenderer from 'marked-terminal';
 import { analyzeReviews, classifyIntent, updateMemory, generateMarketingContent } from './core/agent.js';
+
+// Configure marked to use the terminal renderer
+marked.setOptions({
+	renderer: new TerminalRenderer()
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,7 +58,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => (
     <Box flexDirection="column" paddingBottom={1}>
         {history.map((message, index) => (
             <Box key={index} flexDirection="column">
-                <Text>{message.content}</Text>
+                <Text>{marked(message.content) as string}</Text>
             </Box>
         ))}
     </Box>
