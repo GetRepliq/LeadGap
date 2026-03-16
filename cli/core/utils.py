@@ -396,23 +396,167 @@ def filter_reviews(reviews, min_word_count=5):
 
 
 
+def scrape_competitor_reviews(competitor_name, location, reviews_per_business=20, min_stars=1, max_stars=5):
+    """
+    Surgically scrapes reviews for a SPECIFIC competitor.
+    Handles direct hits (where Google Maps jumps straight to the business page).
+    """
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+    
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    wait = WebDriverWait(driver, 10)
+
+    search_query = f"{competitor_name} in {location}"
+    search_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}"
+    driver.get(search_url)
+    eprint(f"Surgical search initiated for: {search_query}")
+
+    # --- Handle Cookie Consent ---
+    try:
+        consent_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[aria-label='Reject all']")))
+        consent_button.click()
+        time.sleep(1)
+    except TimeoutException:
+        pass
+
+    # --- Check for Direct Hit vs. List ---
+    # If the URL contains "place/" it means we landed directly on the business page
+    time.sleep(3)
+    current_url = driver.current_url
+    
+    if "place/" not in current_url:
+        eprint("Multiple results or search list found. Picking the first match...")
+        try:
+            first_result_selector = "a.hfpxzc"
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, first_result_selector)))
+            driver.find_element(By.CSS_SELECTOR, first_result_selector).click()
+            time.sleep(3)
+        except Exception as e:
+            eprint(f"Error picking first result: {e}")
+            driver.quit()
+            return []
+
+    # --- Now on business page ---
+    try:
+        # Extract name to verify
+        h1_selectors = ["h1", "h1.DUwDvf", "div.fontHeadlineLarge"]
+        found_name = "Unknown"
+        for selector in h1_selectors:
+            try:
+                found_name = driver.find_element(By.CSS_SELECTOR, selector).text
+                if found_name: break
+            except: continue
+        eprint(f"Targeting Business: {found_name}")
+
+        # --- Find and Click the "Reviews" Tab ---
+        reviews_tab = None
+        reviews_tab_selectors = [
+            "//button[@role='tab'][contains(., 'Reviews')]",
+            "//button[contains(@aria-label, 'Reviews')]",
+            "button[aria-label*='Reviews']"
+        ]
+        
+        for selector in reviews_tab_selectors:
+            try:
+                by_type = By.XPATH if selector.startswith('//') else By.CSS_SELECTOR
+                reviews_tab = wait.until(EC.element_to_be_clickable((by_type, selector)))
+                break
+            except: continue
+        
+        if not reviews_tab:
+            eprint("Reviews tab not found.")
+            driver.quit()
+            return []
+        
+        reviews_tab.click()
+        time.sleep(2)
+
+        # --- Find Scrollable Pane ---
+        scrollable_pane = None
+        for selector in ["div.m6QErb[role='main']", "div.m6QErb.DxyBCb.kA9KIf.dS8AEf", "div.m6QErb"]:
+            try:
+                scrollable_pane = driver.find_element(By.CSS_SELECTOR, selector)
+                if scrollable_pane: break
+            except: continue
+
+        # --- Scroll and Load ---
+        review_container_selector = "div.jJc9Ad" # Common container
+        max_scrolls = 15
+        scroll_attempts = 0
+        
+        while len(driver.find_elements(By.CSS_SELECTOR, review_container_selector)) < reviews_per_business and scroll_attempts < max_scrolls:
+            driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", scrollable_pane)
+            time.sleep(2)
+            scroll_attempts += 1
+        
+        # --- Expand "More" ---
+        more_buttons = driver.find_elements(By.CSS_SELECTOR, "button.w8nwRe.kyuRq")
+        for btn in more_buttons:
+            try:
+                driver.execute_script("arguments[0].click();", btn)
+            except: pass
+        time.sleep(1)
+
+        # --- Extract ---
+        all_reviews = []
+        review_elements = driver.find_elements(By.CSS_SELECTOR, review_container_selector)
+        
+        for el in review_elements:
+            try:
+                text = el.find_element(By.CSS_SELECTOR, "span.wiI7pd").text
+                star_aria = el.find_element(By.CSS_SELECTOR, "span.kvMYJc").get_attribute("aria-label")
+                stars = float(star_aria.split(" ")[0]) if star_aria else 0
+                
+                if text and min_stars <= stars <= max_stars:
+                    all_reviews.append({
+                        "business_name": found_name,
+                        "stars": star_aria,
+                        "numerical_stars": stars,
+                        "text": text
+                    })
+            except: continue
+
+        driver.quit()
+        return filter_reviews(all_reviews)
+
+    except Exception as e:
+        eprint(f"Error during surgical extraction: {e}")
+        driver.quit()
+        return []
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Scrape Google Maps reviews for a given search query.")
-    parser.add_argument("search_query", help="The search query for Google Maps (e.g., 'ramen in san francisco').")
-    parser.add_argument("--max_businesses", type=int, default=3, help="Maximum number of businesses to scrape.")
-    parser.add_argument("--reviews_per_business", type=int, default=10, help="Number of reviews to scrape per business.")
-    parser.add_argument("--min_stars", type=int, default=1, help="Minimum star rating to include in scraped reviews (1-5).")
-    parser.add_argument("--max_stars", type=int, default=5, help="Maximum star rating to include in scraped reviews (1-5).")
+    parser = argparse.ArgumentParser(description="Scrape Google Maps reviews.")
+    parser.add_argument("query", nargs="?", help="Search query or competitor name.")
+    parser.add_argument("--mode", default="niche", choices=["niche", "competitor"], help="Scraping mode.")
+    parser.add_argument("--location", help="Location for competitor search.")
+    parser.add_argument("--max_businesses", type=int, default=3)
+    parser.add_argument("--reviews_per_business", type=int, default=10)
+    parser.add_argument("--min_stars", type=int, default=1)
+    parser.add_argument("--max_stars", type=int, default=5)
     args = parser.parse_args()
 
-    # The scraping function now prints progress to stderr, so we can capture JSON from stdout.
-    scraped_data = scrape_all_business_reviews(
-        args.search_query,
-        max_businesses=args.max_businesses,
-        reviews_per_business=args.reviews_per_business,
-        min_stars=args.min_stars,
-        max_stars=args.max_stars
-    )
+    if args.mode == "competitor":
+        if not args.query or not args.location:
+            eprint("Error: Competitor name (query) and --location are required for competitor mode.")
+            sys.exit(1)
+        scraped_data = scrape_competitor_reviews(
+            args.query,
+            args.location,
+            reviews_per_business=args.reviews_per_business,
+            min_stars=args.min_stars,
+            max_stars=args.max_stars
+        )
+    else:
+        scraped_data = scrape_all_business_reviews(
+            args.query,
+            max_businesses=args.max_businesses,
+            reviews_per_business=args.reviews_per_business,
+            min_stars=args.min_stars,
+            max_stars=args.max_stars
+        )
     
-    # Output the final data as a JSON string to stdout
     print(json.dumps(scraped_data, indent=2))

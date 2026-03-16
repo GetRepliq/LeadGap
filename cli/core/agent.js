@@ -351,29 +351,27 @@ export async function classifyIntent(command) {
     return { intent: "error", detail: "GEMINI_API_KEY not found." };
   }
 
-  const prompt = `You are an intent classification AI. You need to determine the user's goal.
+  const prompt = `You are an intent classification AI. Determine the user's goal.
   
   Possible intents:
-  1. "extract_reviews": User wants to find or analyze reviews for a business or niche.
-  2. "generate_content": User wants to create marketing materials, ad copy, or content based on previous research.
-  3. "other": General conversation or unknown requests.
+  1. "extract_reviews": User wants to find general reviews for a niche/area.
+  2. "competitor_analysis": User wants a deep dive into ONE specific business/competitor.
+  3. "generate_content": User wants to create marketing materials based on research.
+  4. "other": General conversation.
 
   The user's command is: "${command}"
 
   Your task is to respond with a JSON object:
   {
-    "intent": "extract_reviews" | "generate_content" | "other",
-    "searchQuery": "the topic/entity for reviews (null if not extract_reviews)",
-    "contentRequest": "description of content to generate (null if not generate_content)"
+    "intent": "extract_reviews" | "competitor_analysis" | "generate_content" | "other",
+    "searchQuery": "niche/topic for extract_reviews (else null)",
+    "competitorName": "exact name of business for competitor_analysis (else null)",
+    "location": "city/area for competitor_analysis (else null)",
+    "contentRequest": "description for generate_content (else null)"
   }
 
-  Example 1:
-  User: "Find reviews for plumbers in Austin"
-  Response: { "intent": "extract_reviews", "searchQuery": "plumbers in Austin", "contentRequest": null }
-
-  Example 2:
-  User: "Write me 2 Facebook ads based on the research"
-  Response: { "intent": "generate_content", "searchQuery": null, "contentRequest": "2 Facebook ads" }
+  Example: "Analyze ABC Plumbing in Austin"
+  Response: { "intent": "competitor_analysis", "competitorName": "ABC Plumbing", "location": "Austin", "searchQuery": null, "contentRequest": null }
 
   Now, process the user's command.
   `;
@@ -391,6 +389,67 @@ export async function classifyIntent(command) {
   } catch (error) {
     console.error('Error during intent classification:', error);
     return { intent: "error", detail: "Failed to classify intent." };
+  }
+}
+
+/**
+ * Performs a surgical analysis of a single competitor to find exploitable weaknesses.
+ * 
+ * @param {Array<Object>} reviews - Reviews for the specific competitor.
+ * @returns {Promise<string>} A formatted 'Battle Card' analysis.
+ */
+export async function analyzeCompetitor(reviews) {
+  if (!GEMINI_API_KEY || !reviews || reviews.length === 0) {
+    return "No reviews found for this competitor to analyze.";
+  }
+
+  const businessName = reviews[0].business_name || "Competitor";
+  const reviewTexts = reviews.map(r => `[Rating: ${r.stars}] ${r.text}`).join('\n- ');
+
+  const prompt = `You are a strategic business consultant. Analyze the following reviews for "${businessName}" and create a COMPETITOR BATTLE CARD.
+
+REVIEWS:
+${reviewTexts}
+
+Your response must be a single JSON object with the following keys:
+{
+  "competitor_name": "${businessName}",
+  "status": "Vulnerable | Dominant | Declining",
+  "top_exploitable_weaknesses": ["list of 3 specific failures"],
+  "customer_frustration_level": "High | Medium | Low",
+  "the_switch_hook": "A 1-sentence persuasive hook to convince their customers to switch to us.",
+  "strategic_notes": "Internal notes on how to position against them."
+}
+
+Return ONLY the raw JSON object.
+`;
+
+  try {
+    const llmText = await withRegionFallback(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "models/gemini-flash-latest",
+        generationConfig: { responseMimeType: "application/json" },
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
+
+    const card = JSON.parse(llmText);
+
+    // Format the Battle Card for terminal display
+    let output = `\n### ⚔️ COMPETITOR BATTLE CARD: ${card.competitor_name} ⚔️\n\n`;
+    output += `**Status:** ${card.status}\n`;
+    output += `**Frustration Level:** ${card.customer_frustration_level}\n\n`;
+    output += `**Top Exploitable Weaknesses:**\n`;
+    card.top_exploitable_weaknesses.forEach((w, i) => output += `${i+1}. ${w}\n`);
+    output += `\n**The "Switch" Hook:**\n> "${card.the_switch_hook}"\n\n`;
+    output += `**Strategic Notes:**\n${card.strategic_notes}\n`;
+
+    return output;
+
+  } catch (error) {
+    console.error('Error during competitor analysis:', error);
+    return `Error analyzing competitor: ${error.message}`;
   }
 }
 

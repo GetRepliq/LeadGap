@@ -9,7 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { marked } from 'marked';
 import TerminalRenderer from 'marked-terminal';
-import { analyzeReviews, classifyIntent, updateMemory, generateMarketingContent } from './core/agent.js';
+import { analyzeReviews, classifyIntent, updateMemory, generateMarketingContent, analyzeCompetitor } from './core/agent.js';
 
 // Configure marked to use the terminal renderer
 marked.setOptions({
@@ -164,7 +164,7 @@ const App = () => {
 		setActiveToolCall(null);
 		setHistory(prev => [...prev, { sender: 'user', content: `> ${command}` }]);
 
-		const { intent, searchQuery, contentRequest, detail } = await classifyIntent(command);
+		const { intent, searchQuery, competitorName, location, contentRequest, detail } = await classifyIntent(command);
 
 		if (intent === 'extract_reviews' && searchQuery) {
 			const toolStartTime = Date.now();
@@ -220,6 +220,52 @@ const App = () => {
 					}
 				} else {
 					setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}` }]);
+					setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
+				}
+				setIsProcessing(false);
+			});
+		} else if (intent === 'competitor_analysis' && competitorName && location) {
+			const toolStartTime = Date.now();
+			setActiveToolCall({ name: "Competitor Analysis Harpoon", query: `${competitorName} in ${location}` });
+			setToolCallStatus(prev => [...prev, "Searching for competitor page..."]);
+
+			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py');
+			const pythonArgs = [pythonScriptPath, competitorName, '--mode', 'competitor', '--location', location, '--reviews_per_business', '30'];
+			const pythonProcess = spawn('python3', pythonArgs);
+
+			let stdoutData = '';
+			let stderrData = '';
+
+			pythonProcess.stdout.on('data', (data) => {
+				stdoutData += data.toString();
+			});
+
+			pythonProcess.stderr.on('data', (data) => {
+				stderrData += data.toString();
+			});
+
+			pythonProcess.on('close', async (code) => {
+				const toolEndTime = Date.now();
+				const timeTakenSeconds = ((toolEndTime - toolStartTime) / 1000);
+				const timeTakenString = timeTakenSeconds > 60 ? `${Math.floor(timeTakenSeconds / 60)}m ${Math.round(timeTakenSeconds % 60)}s` : `${Math.round(timeTakenSeconds)}s`;
+
+				if (code === 0) {
+					try {
+						const reviews = JSON.parse(stdoutData);
+						if (reviews.length === 0) {
+							setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: No reviews found for ${competitorName} in ${location}. Check the name or try another area.` }]);
+						} else {
+							setToolCallStatus(prev => [...prev, `Collected ${reviews.length} reviews. Analyzing weaknesses...`]);
+							const analysis = await analyzeCompetitor(reviews);
+							setHistory(prev => [...prev, { sender: 'agent', content: analysis }]);
+							setToolCallStatus(prev => [...prev, `Battle Card generated in ${timeTakenString}.`]);
+						}
+					} catch (e) {
+						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);
+						setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
+					}
+				} else {
+					setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error during competitor extraction (exit code ${code}).\n${stderrData}` }]);
 					setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
 				}
 				setIsProcessing(false);

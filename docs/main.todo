@@ -29,8 +29,9 @@ User Experience & Feature Updates :
      ✔ Update Agent Response for heading and better markdown support @done(26-03-16 16:23)
 
 Direct Competitor Analysis:
-     ⏳ Develop/adapt scraping module for specific competitor reviews @inprogress(26-03-16 16:33)
-     ⏳ Function to fetch and store reviews for a single competitor via scraping @inprogress(26-03-16 16:33)
+     ✔ Develop/adapt scraping module for specific competitor reviews @done(26-03-16 16:40)
+     ✔ Function to fetch and store reviews for a single competitor via scraping @done(26-03-16 16:40)
+     ⏳ Develop function for extracting competitor profile and links @inprogress(26-03-16 16:41)
      ☐ Run existing NLP pipeline on competitor-specific review data
      ☐ Format and display competitor weakness report
 
