@@ -96260,11 +96260,12 @@ async function classifyIntent(command) {
     return { intent: "error", detail: "Failed to classify intent." };
   }
 }
-async function analyzeCompetitor(reviews) {
+async function analyzeCompetitor(competitorData) {
+  const { business_info, reviews } = competitorData;
   if (!GEMINI_API_KEY || !reviews || reviews.length === 0) {
     return "No reviews found for this competitor to analyze.";
   }
-  const businessName = reviews[0].business_name || "Competitor";
+  const businessName = business_info.name || "Competitor";
   const reviewTexts = reviews.map((r) => `[Rating: ${r.stars}] ${r.text}`).join("\n- ");
   const prompt = `You are a strategic business consultant. Analyze the following reviews for "${businessName}" and create a COMPETITOR BATTLE CARD.
 
@@ -96274,11 +96275,11 @@ ${reviewTexts}
 Your response must be a single JSON object with the following keys:
 {
   "competitor_name": "${businessName}",
-  "status": "Vulnerable | Dominant | Declining",
-  "top_exploitable_weaknesses": ["list of 3 specific failures"],
+  "market_position": "Vulnerable | Dominant | Declining",
+  "key_vulnerabilities": ["list of 3 specific failures"],
   "customer_frustration_level": "High | Medium | Low",
-  "the_switch_hook": "A 1-sentence persuasive hook to convince their customers to switch to us.",
-  "strategic_notes": "Internal notes on how to position against them."
+  "conversion_strategy_hook": "A 1-sentence persuasive hook to convince their customers to switch to us.",
+  "strategic_recommendations": "Internal notes on how to position against them."
 }
 
 Return ONLY the raw JSON object.
@@ -96294,25 +96295,34 @@ Return ONLY the raw JSON object.
     });
     const card = JSON.parse(llmText);
     let output = `
-### \u2694\uFE0F COMPETITOR BATTLE CARD: ${card.competitor_name} \u2694\uFE0F
+### COMPETITOR ANALYSIS REPORT: ${card.competitor_name}
 
 `;
-    output += `**Status:** ${card.status}
+    output += `**Market Position:** ${card.market_position}
 `;
-    output += `**Frustration Level:** ${card.customer_frustration_level}
+    output += `**Customer Frustration Level:** ${card.customer_frustration_level}
 
 `;
-    output += `**Top Exploitable Weaknesses:**
+    output += `**BUSINESS CONTACT INFORMATION:**
 `;
-    card.top_exploitable_weaknesses.forEach((w2, i) => output += `${i + 1}. ${w2}
+    output += `- Website: ${business_info.website || "N/A"}
+`;
+    output += `- Phone: ${business_info.phone || "N/A"}
+`;
+    output += `- Address: ${business_info.address || "N/A"}
+
+`;
+    output += `**Key Vulnerabilities:**
+`;
+    card.key_vulnerabilities.forEach((v2, i) => output += `${i + 1}. ${v2}
 `);
     output += `
-**The "Switch" Hook:**
-> "${card.the_switch_hook}"
+**Strategic Conversion Hook:**
+> "${card.conversion_strategy_hook}"
 
 `;
-    output += `**Strategic Notes:**
-${card.strategic_notes}
+    output += `**Strategic Recommendations:**
+${card.strategic_recommendations}
 `;
     return output;
   } catch (error) {
@@ -96482,8 +96492,8 @@ ${stderrData}` }]);
       });
     } else if (intent === "competitor_analysis" && competitorName && location) {
       const toolStartTime = Date.now();
-      setActiveToolCall({ name: "Competitor Analysis Harpoon", query: `${competitorName} in ${location}` });
-      setToolCallStatus((prev) => [...prev, "Searching for competitor page..."]);
+      setActiveToolCall({ name: "Direct Competitor Analysis", query: `${competitorName} in ${location}` });
+      setToolCallStatus((prev) => [...prev, "Accessing competitor profile..."]);
       const pythonScriptPath = path2.join(__dirname, "..", "core", "utils.py");
       const pythonArgs = [pythonScriptPath, competitorName, "--mode", "competitor", "--location", location, "--reviews_per_business", "30"];
       const pythonProcess = spawn2("python3", pythonArgs);
@@ -96501,14 +96511,14 @@ ${stderrData}` }]);
         const timeTakenString = timeTakenSeconds > 60 ? `${Math.floor(timeTakenSeconds / 60)}m ${Math.round(timeTakenSeconds % 60)}s` : `${Math.round(timeTakenSeconds)}s`;
         if (code === 0) {
           try {
-            const reviews = JSON.parse(stdoutData);
-            if (reviews.length === 0) {
+            const competitorData = JSON.parse(stdoutData);
+            if (!competitorData.reviews || competitorData.reviews.length === 0) {
               setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: No reviews found for ${competitorName} in ${location}. Check the name or try another area.` }]);
             } else {
-              setToolCallStatus((prev) => [...prev, `Collected ${reviews.length} reviews. Analyzing weaknesses...`]);
-              const analysis = await analyzeCompetitor(reviews);
+              setToolCallStatus((prev) => [...prev, `Collected ${competitorData.reviews.length} reviews. Identifying market vulnerabilities...`]);
+              const analysis = await analyzeCompetitor(competitorData);
               setHistory((prev) => [...prev, { sender: "agent", content: analysis }]);
-              setToolCallStatus((prev) => [...prev, `Battle Card generated in ${timeTakenString}.`]);
+              setToolCallStatus((prev) => [...prev, `Analysis report generated in ${timeTakenString}.`]);
             }
           } catch (e) {
             setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);

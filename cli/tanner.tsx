@@ -226,8 +226,8 @@ const App = () => {
 			});
 		} else if (intent === 'competitor_analysis' && competitorName && location) {
 			const toolStartTime = Date.now();
-			setActiveToolCall({ name: "Competitor Analysis Harpoon", query: `${competitorName} in ${location}` });
-			setToolCallStatus(prev => [...prev, "Searching for competitor page..."]);
+			setActiveToolCall({ name: "Direct Competitor Analysis", query: `${competitorName} in ${location}` });
+			setToolCallStatus(prev => [...prev, "Accessing competitor profile..."]);
 
 			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py');
 			const pythonArgs = [pythonScriptPath, competitorName, '--mode', 'competitor', '--location', location, '--reviews_per_business', '30'];
@@ -251,14 +251,14 @@ const App = () => {
 
 				if (code === 0) {
 					try {
-						const reviews = JSON.parse(stdoutData);
-						if (reviews.length === 0) {
+						const competitorData = JSON.parse(stdoutData);
+						if (!competitorData.reviews || competitorData.reviews.length === 0) {
 							setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: No reviews found for ${competitorName} in ${location}. Check the name or try another area.` }]);
 						} else {
-							setToolCallStatus(prev => [...prev, `Collected ${reviews.length} reviews. Analyzing weaknesses...`]);
-							const analysis = await analyzeCompetitor(reviews);
+							setToolCallStatus(prev => [...prev, `Collected ${competitorData.reviews.length} reviews. Identifying market vulnerabilities...`]);
+							const analysis = await analyzeCompetitor(competitorData);
 							setHistory(prev => [...prev, { sender: 'agent', content: analysis }]);
-							setToolCallStatus(prev => [...prev, `Battle Card generated in ${timeTakenString}.`]);
+							setToolCallStatus(prev => [...prev, `Analysis report generated in ${timeTakenString}.`]);
 						}
 					} catch (e) {
 						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);

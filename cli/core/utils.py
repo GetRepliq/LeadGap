@@ -452,6 +452,28 @@ def scrape_competitor_reviews(competitor_name, location, reviews_per_business=20
             except: continue
         eprint(f"Targeting Business: {found_name}")
 
+        # --- Extract Business Info ---
+        business_info = {
+            "name": found_name,
+            "website": "N/A",
+            "phone": "N/A",
+            "address": "N/A"
+        }
+        
+        try:
+            # Website
+            web_el = driver.find_elements(By.CSS_SELECTOR, "a[aria-label^='Website:']")
+            if web_el: business_info["website"] = web_el[0].get_attribute("href")
+            
+            # Phone
+            phone_el = driver.find_elements(By.CSS_SELECTOR, "button[data-item-id^='phone:tel:']")
+            if phone_el: business_info["phone"] = phone_el[0].get_attribute("data-item-id").replace("phone:tel:", "")
+            
+            # Address
+            addr_el = driver.find_elements(By.CSS_SELECTOR, "button[data-item-id^='address']")
+            if addr_el: business_info["address"] = addr_el[0].get_attribute("aria-label").replace("Address: ", "")
+        except: pass
+
         # --- Find and Click the "Reviews" Tab ---
         reviews_tab = None
         reviews_tab_selectors = [
@@ -521,12 +543,15 @@ def scrape_competitor_reviews(competitor_name, location, reviews_per_business=20
             except: continue
 
         driver.quit()
-        return filter_reviews(all_reviews)
+        return {
+            "business_info": business_info,
+            "reviews": filter_reviews(all_reviews)
+        }
 
     except Exception as e:
         eprint(f"Error during surgical extraction: {e}")
         driver.quit()
-        return []
+        return {"business_info": {}, "reviews": []}
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scrape Google Maps reviews.")

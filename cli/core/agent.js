@@ -395,15 +395,16 @@ export async function classifyIntent(command) {
 /**
  * Performs a surgical analysis of a single competitor to find exploitable weaknesses.
  * 
- * @param {Array<Object>} reviews - Reviews for the specific competitor.
+ * @param {Object} competitorData - Data object with business_info and reviews.
  * @returns {Promise<string>} A formatted 'Battle Card' analysis.
  */
-export async function analyzeCompetitor(reviews) {
+export async function analyzeCompetitor(competitorData) {
+  const { business_info, reviews } = competitorData;
   if (!GEMINI_API_KEY || !reviews || reviews.length === 0) {
     return "No reviews found for this competitor to analyze.";
   }
 
-  const businessName = reviews[0].business_name || "Competitor";
+  const businessName = business_info.name || "Competitor";
   const reviewTexts = reviews.map(r => `[Rating: ${r.stars}] ${r.text}`).join('\n- ');
 
   const prompt = `You are a strategic business consultant. Analyze the following reviews for "${businessName}" and create a COMPETITOR BATTLE CARD.
@@ -414,11 +415,11 @@ ${reviewTexts}
 Your response must be a single JSON object with the following keys:
 {
   "competitor_name": "${businessName}",
-  "status": "Vulnerable | Dominant | Declining",
-  "top_exploitable_weaknesses": ["list of 3 specific failures"],
+  "market_position": "Vulnerable | Dominant | Declining",
+  "key_vulnerabilities": ["list of 3 specific failures"],
   "customer_frustration_level": "High | Medium | Low",
-  "the_switch_hook": "A 1-sentence persuasive hook to convince their customers to switch to us.",
-  "strategic_notes": "Internal notes on how to position against them."
+  "conversion_strategy_hook": "A 1-sentence persuasive hook to convince their customers to switch to us.",
+  "strategic_recommendations": "Internal notes on how to position against them."
 }
 
 Return ONLY the raw JSON object.
@@ -436,14 +437,20 @@ Return ONLY the raw JSON object.
 
     const card = JSON.parse(llmText);
 
-    // Format the Battle Card for terminal display
-    let output = `\n### ⚔️ COMPETITOR BATTLE CARD: ${card.competitor_name} ⚔️\n\n`;
-    output += `**Status:** ${card.status}\n`;
-    output += `**Frustration Level:** ${card.customer_frustration_level}\n\n`;
-    output += `**Top Exploitable Weaknesses:**\n`;
-    card.top_exploitable_weaknesses.forEach((w, i) => output += `${i+1}. ${w}\n`);
-    output += `\n**The "Switch" Hook:**\n> "${card.the_switch_hook}"\n\n`;
-    output += `**Strategic Notes:**\n${card.strategic_notes}\n`;
+    // Format the Analysis Report for terminal display
+    let output = `\n### COMPETITOR ANALYSIS REPORT: ${card.competitor_name}\n\n`;
+    output += `**Market Position:** ${card.market_position}\n`;
+    output += `**Customer Frustration Level:** ${card.customer_frustration_level}\n\n`;
+    
+    output += `**BUSINESS CONTACT INFORMATION:**\n`;
+    output += `- Website: ${business_info.website || 'N/A'}\n`;
+    output += `- Phone: ${business_info.phone || 'N/A'}\n`;
+    output += `- Address: ${business_info.address || 'N/A'}\n\n`;
+
+    output += `**Key Vulnerabilities:**\n`;
+    card.key_vulnerabilities.forEach((v, i) => output += `${i+1}. ${v}\n`);
+    output += `\n**Strategic Conversion Hook:**\n> "${card.conversion_strategy_hook}"\n\n`;
+    output += `**Strategic Recommendations:**\n${card.strategic_recommendations}\n`;
 
     return output;
 
