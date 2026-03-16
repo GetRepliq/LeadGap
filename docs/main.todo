@@ -26,6 +26,7 @@ User Experience & Feature Updates :
      ✔ Update LLM module for regional vertex AI endpoints @done(26-03-13 20:41)
      ✔ Update LLM Vertex AI Endpoint Module for region 503 Error Retry @done(26-03-13 20:41)
      ✔ Update LLM Vertex AI Endpoint Module with region session persistence @done(26-03-13 20:41)
+     ⏳ Update Agent Response for heading and better markdown support @inprogress(26-03-16 16:08)
 
 Direct Competitor Analysis:
      ☐ Develop/adapt scraping module for specific competitor reviews
@@ -36,5 +37,5 @@ Direct Competitor Analysis:
 Automated Ad Copy Generation:
      ☐ Create LLM prompt templates for ad copy (Google, Facebook)
      ☐ Create LLM prompt templates for landing page content
-     ⏳ Agent tool to trigger content generation from service gap data @inprogress(26-03-14 16:27)
+     ✔ Agent tool to trigger content generation from service gap data @done(26-03-16 16:07)
      ☐ Present generated ad/web content to the user for copy-pasting
