@@ -33,7 +33,7 @@ Direct Competitor Analysis:
      ✔ Function to fetch and store reviews for a single competitor via scraping @done(26-03-16 16:40)
      ✔ Develop function for extracting competitor profile and links @done(26-03-16 16:51)
      ☐ Run existing NLP pipeline on competitor-specific review data
-     ☐ Format and display competitor weakness report
+     ✔ Format and display competitor weakness report @done(26-03-16 16:58)
 
 Automated Ad Copy Generation:
      ☐ Create LLM prompt templates for ad copy (Google, Facebook)
