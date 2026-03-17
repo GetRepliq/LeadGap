@@ -37,7 +37,7 @@ Direct Competitor Analysis:
      ✔ Add Review Context in Agent Response for Key Vulnerabilities @done(26-03-17 17:17)
 
 Automated Ad Copy Generation:
-     ⏳ Create LLM prompt templates for ad copy (Google, Facebook) @inprogress(26-03-17 17:17) 
-     ⏳ Create LLM prompt templates for landing page content @inprogress(26-03-17 17:17) 
+     ✔ Create LLM prompt templates for ad copy (Google, Facebook) @done(26-03-17 17:27)
+     ✔ Create LLM prompt templates for landing page content @done(26-03-17 17:27)
      ✔ Agent tool to trigger content generation from service gap data @done(26-03-16 16:07)
      ☐ Present generated ad/web content to the user for copy-pasting

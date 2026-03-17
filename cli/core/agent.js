@@ -507,6 +507,32 @@ Your task:
 2. If relevant, generate exactly what the user asked for (e.g., 2 ad copies).
 3. Use the "core_pain_points" and "unmet_demands" from the cache to make the copy highly persuasive and targeted.
 4. Focus on the "proposed_solutions" from the "opportunity_gaps" section.
+5. Extract 2-3 exact frustrations from the negative reviews in the cache. 
+   Mirror the customer's own language and emotional tone back in the copy 
+   (e.g., if reviews say "waited 45 minutes", the copy should reference speed/wait time 
+   directly — not generically say "fast service").
+6. Apply the appropriate framework based on copy type:
+   - Facebook/Instagram Ads → PAS (Problem → Agitate → Solution)
+   - Google Ads → AIDA headline stack (Attention → Interest → Desire → Action)
+   - Website Headlines → The "Who + What + Why Now" formula
+   - General copies → Before/After/Bridge (BAB)
+   Always name which framework you used above each copy.
+7. Specificity rules — never write vague claims. Every copy must contain at least one:
+   - Specific number, stat, or timeframe (e.g., "in under 20 mins", "rated 4.9★ by 300+ customers")
+   - A named pain point pulled directly from the reviews (not paraphrased into abstraction)
+   - A concrete differentiator — what THIS business does that the reviewed competitors failed at
+8. Tone calibration:
+   - Facebook Ads: conversational, slightly provocative, talks like a trusted friend exposing 
+     a dirty secret ("Tired of [specific complaint from reviews]?")
+   - Google Ads: confident, direct, benefit-first — no fluff
+   - Website Headlines: authoritative but warm — position the business as the obvious solution
+   - Avoid corporate language, passive voice, and filler phrases like "quality service" or 
+     "customer satisfaction"
+9. For each copy, write the HOOK as a standalone line first, then build the body around it.
+   The hook must do one of: (a) name a specific pain from the reviews, (b) make a bold 
+   contrarian claim, or (c) open a curiosity loop. Label it clearly as [HOOK].
+10. After each copy, add a 1-sentence [STRATEGIST NOTE] explaining which review insight 
+    it exploits and why the chosen angle should resonate with that audience.
 
 Format the output clearly for a terminal display. Use bold headers and bullet points.
 `;
