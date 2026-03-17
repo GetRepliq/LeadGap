@@ -96055,7 +96055,7 @@ ${businessesBlock}
 For each business, provide:
 - A concise summary (no more than 10 words)
 - Key positive remarks (no more than 10 words)
-- Actionable complaints with frustration intensity (low, medium, or high)
+- Actionable complaints with frustration intensity (low, medium, or high) AND a supporting snippet from a review.
 - Any detected buying intent
 
 Return your analysis as a single JSON object with a top-level key "businesses" which is an array of objects, one per business. Your entire response must be only the raw JSON object, with no markdown formatting or other text.
@@ -96070,7 +96070,8 @@ Example JSON structure:
       "actionable_complaints": [
         {
           "complaint": "Specific complaint that the business can act on.",
-          "frustration_intensity": "low"
+          "frustration_intensity": "low",
+          "source_quote": "Exact snippet from the review."
         }
       ],
       "buying_intent": {
@@ -96131,6 +96132,8 @@ Example JSON structure:
 `;
         complaints.forEach((comp, idx) => {
           fullAnalysisOutput += `    ${idx + 1}. ${comp.complaint} (Frustration: ${comp.frustration_intensity || "N/A"})
+`;
+          fullAnalysisOutput += `    \u2514 [${comp.source_quote || "N/A"}]
 `;
         });
       } else {
@@ -96276,13 +96279,18 @@ Your response must be a single JSON object with the following keys:
 {
   "competitor_name": "${businessName}",
   "market_position": "Vulnerable | Dominant | Declining",
-  "key_vulnerabilities": ["list of 3 specific failures"],
+  "key_vulnerabilities": [
+    {
+      "issue": "Specific failure description",
+      "source_review": "The exact quote or snippet of the review that proves this."
+    }
+  ],
   "customer_frustration_level": "High | Medium | Low",
   "conversion_strategy_hook": "A 1-sentence persuasive hook to convince their customers to switch to us.",
   "strategic_recommendations": "Internal notes on how to position against them."
 }
 
-Return ONLY the raw JSON object.
+Return exactly 3 vulnerabilities. Return ONLY the raw JSON object.
 `;
   try {
     const llmText = await withRegionFallback(async (genAI) => {
@@ -96313,9 +96321,14 @@ Return ONLY the raw JSON object.
 
 `;
     output += `**Key Vulnerabilities:**
+
 `;
-    card.key_vulnerabilities.forEach((v2, i) => output += `${i + 1}. ${v2}
-`);
+    card.key_vulnerabilities.forEach((v2, i) => {
+      output += `    ${i + 1}. ${v2.issue}
+`;
+      output += `\u2514 [${v2.source_review}]
+`;
+    });
     output += `
 **Strategic Conversion Hook:**
 > "${card.conversion_strategy_hook}"
