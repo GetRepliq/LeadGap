@@ -34,6 +34,7 @@ Direct Competitor Analysis:
      ✔ Develop function for extracting competitor profile and links @done(26-03-16 16:51)
      ☐ Run existing NLP pipeline on competitor-specific review data
      ✔ Format and display competitor weakness report @done(26-03-16 16:58)
+     ⏳ Add Review Context in Agent Response for Key Vulnerabilities @inprogress(26-03-17 16:40)
 
 Automated Ad Copy Generation:
      ☐ Create LLM prompt templates for ad copy (Google, Facebook)
