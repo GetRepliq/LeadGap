@@ -27,6 +27,7 @@ User Experience & Feature Updates :
      ✔ Update LLM Vertex AI Endpoint Module for region 503 Error Retry @done(26-03-13 20:41)
      ✔ Update LLM Vertex AI Endpoint Module with region session persistence @done(26-03-13 20:41)
      ✔ Update Agent Response for heading and better markdown support @done(26-03-16 16:23)
+     ⏳ Persistant tool call indicator fixed in TUI @inprogress(26-03-18 16:33)
 
 Direct Competitor Analysis:
      ✔ Develop/adapt scraping module for specific competitor reviews @done(26-03-16 16:40)
