@@ -1,0 +1,95 @@
+{
+  "project": {
+    "niche": "Residential Plumbing and Drain Services",
+    "location": "Austin, Texas",
+    "last_updated": "2023-10-27T14:30:00Z",
+    "total_businesses_analyzed": 3
+  },
+  "market_intelligence": {
+    "summary": "The Austin plumbing market is highly competitive with a strong emphasis on speed of service (same-day) and professional project management. Consumers demonstrate high loyalty when technicians provide clear communication and cleanliness, though price sensitivity remains a notable friction point for specialized or complex labor.",
+    "core_pain_points": [
+      {
+        "issue": "Price-to-Value Disconnect",
+        "intensity": "low",
+        "evidence": "Complaints regarding specialized service costs being higher than initial customer expectations.",
+        "context": "Even with transparent pricing, customers feel a financial strain when tasks involve complex diagnostics or specialized repairs."
+      }
+    ],
+    "unmet_demands": [
+      "Flexible financing for high-cost specialized repairs",
+      "Tiered pricing models for diagnostic services",
+      "Consolidated HVAC and Plumbing maintenance packages"
+    ]
+  },
+  "competitor_matrix": [
+    {
+      "name": "Beyond Wow Plumbing & Drains",
+      "weaknesses": [
+        "Premium pricing for specialized work"
+      ],
+      "strengths": [
+        "Same-day repair capability",
+        "Expert diagnostic precision",
+        "High transparency"
+      ],
+      "sentiment_trends": "Strongly positive regarding reliability and speed."
+    },
+    {
+      "name": "Reliant Plumbing - Austin",
+      "weaknesses": [
+        "Lack of documented budget-tier options"
+      ],
+      "strengths": [
+        "Complex repiping expertise",
+        "Exceptional project management",
+        "Cleanliness and site protection"
+      ],
+      "sentiment_trends": "Highly recommended for major infrastructure projects."
+    },
+    {
+      "name": "Daniel's Plumbing and Air Conditioning",
+      "weaknesses": [
+        "Higher-than-expected initial service costs"
+      ],
+      "strengths": [
+        "Dual-trade (HVAC/Plumbing) convenience",
+        "Membership-based loyalty discounts",
+        "Non-aggressive sales tactics"
+      ],
+      "sentiment_trends": "Favored by long-term residents seeking low-pressure service."
+    }
+  ],
+  "opportunity_gaps": [
+    {
+      "gap_id": "gap_1",
+      "description": "Premium Specialized Service Shock",
+      "proposed_solution": "Introduce a 'Value-Match Guarantee' or detailed educational cost-breakdown videos for complex repiping to justify high-end pricing before the invoice.",
+      "estimated_value": "medium"
+    },
+    {
+      "gap_id": "gap_2",
+      "description": "Hyper-Fast Scheduling Demand",
+      "proposed_solution": "Develop a real-time 'Next Available Tech' live tracker on the website to convert high-intent customers needing immediate relief.",
+      "estimated_value": "high"
+    }
+  ],
+  "generated_assets": {
+    "value_propositions": [
+      "Expert Plumbing Diagnostics with Zero-Pressure Sales",
+      "Austin's Cleanest Repiping Specialists",
+      "Same-Day Solutions for Complex Drain Issues"
+    ],
+    "ad_copy_snippets": {
+      "search_ads": [
+        {
+          "headline": "Same-Day Austin Plumbing | Expert Service",
+          "description": "Don't wait for a fix. Get transparent pricing and expert diagnostics today. Clean, fast, and professional."
+        },
+        {
+          "headline": "Expert Repiping in Austin | Reliant & Clean",
+          "description": "Major plumbing projects handled with care. Clear communication and spotless results. Book your estimate."
+        }
+      ]
+    }
+  }
+}

@@ -96432,7 +96432,12 @@ var Header = () => {
   const headerLines = HEADER_ASCII.split("\n");
   return /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexDirection: "column", alignItems: "flex-start", paddingBottom: 1 }, /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexDirection: "column" }, /* @__PURE__ */ import_react27.default.createElement(Text, { bold: true, color: "#023e7d" }, headerLines[0]), /* @__PURE__ */ import_react27.default.createElement(Text, { bold: true, color: "#023e7d" }, headerLines[1]), /* @__PURE__ */ import_react27.default.createElement(Text, { bold: true, color: "#0353a4" }, headerLines[2]), /* @__PURE__ */ import_react27.default.createElement(Text, { bold: true, color: "#0353a4" }, headerLines[3]), /* @__PURE__ */ import_react27.default.createElement(Text, { bold: true, color: "#0466c8" }, headerLines[4]), /* @__PURE__ */ import_react27.default.createElement(Text, { bold: true, color: "#0466c8" }, headerLines[5])), /* @__PURE__ */ import_react27.default.createElement(Box_default, { marginTop: 1, width: 80, justifyContent: "flex-start" }, /* @__PURE__ */ import_react27.default.createElement(Text, { color: "gray", dimColor: true, italic: true, wrap: "wrap" }, "An AI platform that analyzes real customer complaints to reveal unmet service demand")));
 };
-var ChatHistory = ({ history }) => /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexDirection: "column", paddingBottom: 1 }, history.map((message, index) => /* @__PURE__ */ import_react27.default.createElement(Box_default, { key: index, flexDirection: "column" }, /* @__PURE__ */ import_react27.default.createElement(Text, null, g(message.content)))));
+var ChatHistory = ({ history }) => /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexDirection: "column", paddingBottom: 1 }, history.map((message, index) => {
+  if (message.sender === "tool") {
+    return /* @__PURE__ */ import_react27.default.createElement(ToolCallDisplay, { key: index, toolCall: message.toolCall, status: message.status });
+  }
+  return /* @__PURE__ */ import_react27.default.createElement(Box_default, { key: index, flexDirection: "column" }, /* @__PURE__ */ import_react27.default.createElement(Text, null, g(message.content || "")));
+}));
 var InputBox = ({ value }) => {
   const parts = value.split(/(@\S+)/);
   return /* @__PURE__ */ import_react27.default.createElement(Box_default, { borderStyle: "single", paddingX: 1 }, /* @__PURE__ */ import_react27.default.createElement(Text, null, parts.map((part, i) => {
@@ -96452,7 +96457,19 @@ var FileSuggestions = ({ suggestions, activeIndex }) => {
   }));
 };
 var ToolCallDisplay = ({ toolCall, status }) => /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexDirection: "column", paddingBottom: 1 }, /* @__PURE__ */ import_react27.default.createElement(Text, { color: "blue" }, toolCall.name, ' ("', toolCall.query, '")'), status.map((s, i) => /* @__PURE__ */ import_react27.default.createElement(Box_default, { marginLeft: 2, key: i }, /* @__PURE__ */ import_react27.default.createElement(Text, { color: "gray" }, "\u2514 ", s))));
-var Processing = () => /* @__PURE__ */ import_react27.default.createElement(Box_default, null, /* @__PURE__ */ import_react27.default.createElement(Text, null, /* @__PURE__ */ import_react27.default.createElement(build_default, null), " Processing..."));
+var PROCESSING_MESSAGES = [
+  "Crunching the data...",
+  "Decoding customer frustrations...",
+  "Identifying service gaps...",
+  "Analyzing market signals...",
+  "Sifting through reviews...",
+  "Distilling market intelligence...",
+  "Mapping competitive weaknesses...",
+  "Crafting strategic insights...",
+  "Synchronizing with intelligence cache...",
+  "Mining for opportunity gaps..."
+];
+var Processing = ({ message }) => /* @__PURE__ */ import_react27.default.createElement(Box_default, null, /* @__PURE__ */ import_react27.default.createElement(Text, null, /* @__PURE__ */ import_react27.default.createElement(build_default, null), " ", message));
 var App2 = () => {
   const { exit } = use_app_default();
   const [history, setHistory] = (0, import_react27.useState)([]);
@@ -96461,7 +96478,7 @@ var App2 = () => {
   const [suggestionBoxVisible, setSuggestionBoxVisible] = (0, import_react27.useState)(false);
   const [activeIndex, setActiveIndex] = (0, import_react27.useState)(0);
   const [isProcessing, setIsProcessing] = (0, import_react27.useState)(false);
-  const [startTime, setStartTime] = (0, import_react27.useState)(null);
+  const [processingMessage, setProcessingMessage] = (0, import_react27.useState)(PROCESSING_MESSAGES[0]);
   const [activeToolCall, setActiveToolCall] = (0, import_react27.useState)(null);
   const [toolCallStatus, setToolCallStatus] = (0, import_react27.useState)([]);
   (0, import_react27.useEffect)(() => {
@@ -96476,19 +96493,27 @@ var App2 = () => {
   }, [suggestionBoxVisible]);
   const handleCommand = async (command) => {
     setIsProcessing(true);
+    setProcessingMessage(PROCESSING_MESSAGES[Math.floor(Math.random() * PROCESSING_MESSAGES.length)]);
     setToolCallStatus([]);
     setActiveToolCall(null);
     setHistory((prev) => [...prev, { sender: "user", content: `> ${command}` }]);
     const { intent, searchQuery, competitorName, location, contentRequest, detail } = await classifyIntent(command);
     if (intent === "extract_reviews" && searchQuery) {
       const toolStartTime = Date.now();
-      setActiveToolCall({ name: "Google Reviews Extraction", query: searchQuery });
-      setToolCallStatus((prev) => [...prev, "Initiated."]);
+      const toolName = "Google Reviews Extraction";
+      const toolQuery = searchQuery;
+      setActiveToolCall({ name: toolName, query: toolQuery });
+      setToolCallStatus(["Initiated."]);
       const pythonScriptPath = path2.join(__dirname, "..", "core", "utils.py");
       const pythonArgs = [pythonScriptPath, searchQuery];
       const pythonProcess = spawn2("python3", pythonArgs);
       let stdoutData = "";
       let stderrData = "";
+      let currentStatuses = ["Initiated."];
+      const updateStatus = (status) => {
+        currentStatuses = [...currentStatuses, status];
+        setToolCallStatus(currentStatuses);
+      };
       pythonProcess.stdout.on("data", (data) => {
         stdoutData += data.toString();
       });
@@ -96505,39 +96530,61 @@ var App2 = () => {
           try {
             const reviews = JSON.parse(stdoutData);
             const numReviews = reviews.length;
-            setToolCallStatus((prev) => [...prev, `Collected ${numReviews} reviews. Processing...`]);
+            updateStatus(`Collected ${numReviews} reviews. Processing...`);
             const { formattedAnalysis, rawJson } = await analyzeReviews(reviews);
-            setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI:
-${formattedAnalysis}` }]);
-            setToolCallStatus((prev) => [...prev, `Analysis completed in ${timeTakenString}.`]);
+            updateStatus(`Analysis completed in ${timeTakenString}.`);
             if (rawJson) {
-              setToolCallStatus((prev) => [...prev, "Syncing to Market Intelligence Cache..."]);
-              updateMemory(rawJson, searchQuery).then(() => {
-                setToolCallStatus((prev) => [...prev, "Cache updated successfully."]);
-              }).catch((err) => {
-                setToolCallStatus((prev) => [...prev, `Cache sync failed: ${err.message}`]);
-              });
+              updateStatus("Syncing to Market Intelligence Cache...");
+              try {
+                await updateMemory(rawJson, searchQuery);
+                updateStatus("Cache updated successfully.");
+              } catch (err) {
+                updateStatus(`Cache sync failed: ${err.message}`);
+              }
             }
+            setHistory((prev) => [
+              ...prev,
+              { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+              { sender: "agent", content: `Tanner AI:
+${formattedAnalysis}` }
+            ]);
           } catch (e) {
-            setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);
-            setToolCallStatus((prev) => [...prev, `Failed in ${timeTakenString}.`]);
+            updateStatus(`Failed in ${timeTakenString}.`);
+            setHistory((prev) => [
+              ...prev,
+              { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+              { sender: "agent", content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }
+            ]);
           }
         } else {
-          setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: Error during review extraction (exit code ${code}).
-${stderrData}` }]);
-          setToolCallStatus((prev) => [...prev, `Failed in ${timeTakenString}.`]);
+          updateStatus(`Failed in ${timeTakenString}.`);
+          setHistory((prev) => [
+            ...prev,
+            { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+            { sender: "agent", content: `Tanner AI: Error during review extraction (exit code ${code}).
+${stderrData}` }
+          ]);
         }
+        setActiveToolCall(null);
+        setToolCallStatus([]);
         setIsProcessing(false);
       });
     } else if (intent === "competitor_analysis" && competitorName && location) {
       const toolStartTime = Date.now();
-      setActiveToolCall({ name: "Direct Competitor Analysis", query: `${competitorName} in ${location}` });
-      setToolCallStatus((prev) => [...prev, "Accessing competitor profile..."]);
+      const toolName = "Direct Competitor Analysis";
+      const toolQuery = `${competitorName} in ${location}`;
+      setActiveToolCall({ name: toolName, query: toolQuery });
+      setToolCallStatus(["Accessing competitor profile..."]);
       const pythonScriptPath = path2.join(__dirname, "..", "core", "utils.py");
       const pythonArgs = [pythonScriptPath, competitorName, "--mode", "competitor", "--location", location, "--reviews_per_business", "30"];
       const pythonProcess = spawn2("python3", pythonArgs);
       let stdoutData = "";
       let stderrData = "";
+      let currentStatuses = ["Accessing competitor profile..."];
+      const updateStatus = (status) => {
+        currentStatuses = [...currentStatuses, status];
+        setToolCallStatus(currentStatuses);
+      };
       pythonProcess.stdout.on("data", (data) => {
         stdoutData += data.toString();
       });
@@ -96552,31 +96599,57 @@ ${stderrData}` }]);
           try {
             const competitorData = JSON.parse(stdoutData);
             if (!competitorData.reviews || competitorData.reviews.length === 0) {
-              setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: No reviews found for ${competitorName} in ${location}. Check the name or try another area.` }]);
+              updateStatus(`No reviews found.`);
+              setHistory((prev) => [
+                ...prev,
+                { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+                { sender: "agent", content: `Tanner AI: No reviews found for ${competitorName} in ${location}. Check the name or try another area.` }
+              ]);
             } else {
-              setToolCallStatus((prev) => [...prev, `Collected ${competitorData.reviews.length} reviews. Identifying market vulnerabilities...`]);
+              updateStatus(`Collected ${competitorData.reviews.length} reviews. Identifying market vulnerabilities...`);
               const analysis = await analyzeCompetitor(competitorData);
-              setHistory((prev) => [...prev, { sender: "agent", content: analysis }]);
-              setToolCallStatus((prev) => [...prev, `Analysis report generated in ${timeTakenString}.`]);
+              updateStatus(`Analysis report generated in ${timeTakenString}.`);
+              setHistory((prev) => [
+                ...prev,
+                { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+                { sender: "agent", content: analysis }
+              ]);
             }
           } catch (e) {
-            setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);
-            setToolCallStatus((prev) => [...prev, `Failed in ${timeTakenString}.`]);
+            updateStatus(`Failed in ${timeTakenString}.`);
+            setHistory((prev) => [
+              ...prev,
+              { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+              { sender: "agent", content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }
+            ]);
           }
         } else {
-          setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: Error during competitor extraction (exit code ${code}).
-${stderrData}` }]);
-          setToolCallStatus((prev) => [...prev, `Failed in ${timeTakenString}.`]);
+          updateStatus(`Failed in ${timeTakenString}.`);
+          setHistory((prev) => [
+            ...prev,
+            { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+            { sender: "agent", content: `Tanner AI: Error during competitor extraction (exit code ${code}).
+${stderrData}` }
+          ]);
         }
+        setActiveToolCall(null);
+        setToolCallStatus([]);
         setIsProcessing(false);
       });
     } else if (intent === "generate_content" && contentRequest) {
-      setActiveToolCall({ name: "Generating Marketing Content", query: contentRequest });
-      setToolCallStatus((prev) => [...prev, "Reading cache..."]);
+      const toolName = "Generating Marketing Content";
+      const toolQuery = contentRequest;
+      setActiveToolCall({ name: toolName, query: toolQuery });
+      setToolCallStatus(["Reading cache..."]);
       const content = await generateMarketingContent(contentRequest);
-      setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI:
-${content}` }]);
-      setToolCallStatus((prev) => [...prev, "Content generated successfully."]);
+      setHistory((prev) => [
+        ...prev,
+        { sender: "tool", toolCall: { name: toolName, query: toolQuery }, status: ["Reading cache...", "Content generated successfully."] },
+        { sender: "agent", content: `Tanner AI:
+${content}` }
+      ]);
+      setActiveToolCall(null);
+      setToolCallStatus([]);
       setIsProcessing(false);
     } else if (intent === "error") {
       setHistory((prev) => [...prev, { sender: "agent", content: `Tanner AI: Error: ${detail}` }]);
@@ -96620,7 +96693,7 @@ ${content}` }]);
       }
     }
   });
-  return /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexDirection: "column", width: "100%", height: "100%" }, /* @__PURE__ */ import_react27.default.createElement(Header, null), /* @__PURE__ */ import_react27.default.createElement(ChatHistory, { history }), /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexGrow: 1 }), activeToolCall && /* @__PURE__ */ import_react27.default.createElement(ToolCallDisplay, { toolCall: activeToolCall, status: toolCallStatus }), isProcessing && /* @__PURE__ */ import_react27.default.createElement(Processing, null), /* @__PURE__ */ import_react27.default.createElement(
+  return /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexDirection: "column", width: "100%", height: "100%" }, /* @__PURE__ */ import_react27.default.createElement(Header, null), /* @__PURE__ */ import_react27.default.createElement(ChatHistory, { history }), /* @__PURE__ */ import_react27.default.createElement(Box_default, { flexGrow: 1 }), activeToolCall && /* @__PURE__ */ import_react27.default.createElement(ToolCallDisplay, { toolCall: activeToolCall, status: toolCallStatus }), isProcessing && /* @__PURE__ */ import_react27.default.createElement(Processing, { message: processingMessage }), /* @__PURE__ */ import_react27.default.createElement(
     InputBox,
     {
       value: inputValue

@@ -50,17 +50,29 @@ const Header = () => {
     );
 };
 
+interface Message {
+	sender: 'user' | 'agent' | 'tool';
+	content?: string;
+	toolCall?: { name: string; query: string };
+	status?: string[];
+}
+
 interface ChatHistoryProps {
-    history: { sender: 'user' | 'agent'; content: string }[];
+    history: Message[];
 }
 
 const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => (
     <Box flexDirection="column" paddingBottom={1}>
-        {history.map((message, index) => (
-            <Box key={index} flexDirection="column">
-                <Text>{marked(message.content) as string}</Text>
-            </Box>
-        ))}
+        {history.map((message, index) => {
+			if (message.sender === 'tool') {
+				return <ToolCallDisplay key={index} toolCall={message.toolCall!} status={message.status!} />;
+			}
+			return (
+				<Box key={index} flexDirection="column">
+					<Text>{marked(message.content || '') as string}</Text>
+				</Box>
+			);
+		})}
     </Box>
 );
 
@@ -126,23 +138,36 @@ const ToolCallDisplay: React.FC<{toolCall: {name: string; query: string}; status
 	</Box>
 );
 
-const Processing = () => (
+const PROCESSING_MESSAGES = [
+	"Crunching the data...",
+	"Decoding customer frustrations...",
+	"Identifying service gaps...",
+	"Analyzing market signals...",
+	"Sifting through reviews...",
+	"Distilling market intelligence...",
+	"Mapping competitive weaknesses...",
+	"Crafting strategic insights...",
+	"Synchronizing with intelligence cache...",
+	"Mining for opportunity gaps..."
+];
+
+const Processing = ({ message }: { message: string }) => (
 	<Box>
 		<Text>
-			<Spinner /> Processing...
+			<Spinner /> {message}
 		</Text>
 	</Box>
 );
 
 const App = () => {
 	const { exit } = useApp();
-	const [history, setHistory] = useState<{ sender: 'user' | 'agent'; content: string }[]>([]);
+	const [history, setHistory] = useState<Message[]>([]);
 	const [inputValue, setInputValue] = useState('');
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 	const [suggestionBoxVisible, setSuggestionBoxVisible] = useState(false);
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [isProcessing, setIsProcessing] = useState(false);
-	const [startTime, setStartTime] = useState<number | null>(null);
+	const [processingMessage, setProcessingMessage] = useState(PROCESSING_MESSAGES[0]);
 	const [activeToolCall, setActiveToolCall] = useState<{name: string; query: string} | null>(null);
 	const [toolCallStatus, setToolCallStatus] = useState<string[]>([]);
 
@@ -160,6 +185,7 @@ const App = () => {
 
 	const handleCommand = async (command: string) => {
 		setIsProcessing(true);
+		setProcessingMessage(PROCESSING_MESSAGES[Math.floor(Math.random() * PROCESSING_MESSAGES.length)]);
 		setToolCallStatus([]);
 		setActiveToolCall(null);
 		setHistory(prev => [...prev, { sender: 'user', content: `> ${command}` }]);
@@ -168,8 +194,11 @@ const App = () => {
 
 		if (intent === 'extract_reviews' && searchQuery) {
 			const toolStartTime = Date.now();
-			setActiveToolCall({ name: "Google Reviews Extraction", query: searchQuery });
-			setToolCallStatus(prev => [...prev, "Initiated."]);
+			const toolName = "Google Reviews Extraction";
+			const toolQuery = searchQuery;
+			
+			setActiveToolCall({ name: toolName, query: toolQuery });
+			setToolCallStatus(["Initiated."]);
 
 			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py');
 			const pythonArgs = [pythonScriptPath, searchQuery];
@@ -177,6 +206,12 @@ const App = () => {
 
 			let stdoutData = '';
 			let stderrData = '';
+			let currentStatuses = ["Initiated."];
+
+			const updateStatus = (status: string) => {
+				currentStatuses = [...currentStatuses, status];
+				setToolCallStatus(currentStatuses);
+			};
 
 			pythonProcess.stdout.on('data', (data) => {
 				stdoutData += data.toString();
@@ -197,37 +232,54 @@ const App = () => {
 					try {
 						const reviews = JSON.parse(stdoutData);
 						const numReviews = reviews.length;
-						setToolCallStatus(prev => [...prev, `Collected ${numReviews} reviews. Processing...`]);
+						updateStatus(`Collected ${numReviews} reviews. Processing...`);
 						
 						const { formattedAnalysis, rawJson } = await analyzeReviews(reviews);
-						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI:\n${formattedAnalysis}` }]);
-						setToolCallStatus(prev => [...prev, `Analysis completed in ${timeTakenString}.`]);
+						updateStatus(`Analysis completed in ${timeTakenString}.`);
 
 						if (rawJson) {
-							setToolCallStatus(prev => [...prev, "Syncing to Market Intelligence Cache..."]);
-							updateMemory(rawJson, searchQuery)
-								.then(() => {
-									setToolCallStatus(prev => [...prev, "Cache updated successfully."]);
-								})
-								.catch((err) => {
-									setToolCallStatus(prev => [...prev, `Cache sync failed: ${err.message}`]);
-								});
+							updateStatus("Syncing to Market Intelligence Cache...");
+							try {
+								await updateMemory(rawJson, searchQuery);
+								updateStatus("Cache updated successfully.");
+							} catch (err: any) {
+								updateStatus(`Cache sync failed: ${err.message}`);
+							}
 						}
 
+						setHistory(prev => [
+							...prev,
+							{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+							{ sender: 'agent', content: `Tanner AI:\n${formattedAnalysis}` }
+						]);
+
 					} catch (e) {
-						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);
-						setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
+						updateStatus(`Failed in ${timeTakenString}.`);
+						setHistory(prev => [
+							...prev,
+							{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+							{ sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }
+						]);
 					}
 				} else {
-					setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}` }]);
-					setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
+					updateStatus(`Failed in ${timeTakenString}.`);
+					setHistory(prev => [
+						...prev,
+						{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+						{ sender: 'agent', content: `Tanner AI: Error during review extraction (exit code ${code}).\n${stderrData}` }
+					]);
 				}
+				setActiveToolCall(null);
+				setToolCallStatus([]);
 				setIsProcessing(false);
 			});
 		} else if (intent === 'competitor_analysis' && competitorName && location) {
 			const toolStartTime = Date.now();
-			setActiveToolCall({ name: "Direct Competitor Analysis", query: `${competitorName} in ${location}` });
-			setToolCallStatus(prev => [...prev, "Accessing competitor profile..."]);
+			const toolName = "Direct Competitor Analysis";
+			const toolQuery = `${competitorName} in ${location}`;
+			
+			setActiveToolCall({ name: toolName, query: toolQuery });
+			setToolCallStatus(["Accessing competitor profile..."]);
 
 			const pythonScriptPath = path.join(__dirname, '..', 'core', 'utils.py');
 			const pythonArgs = [pythonScriptPath, competitorName, '--mode', 'competitor', '--location', location, '--reviews_per_business', '30'];
@@ -235,6 +287,12 @@ const App = () => {
 
 			let stdoutData = '';
 			let stderrData = '';
+			let currentStatuses = ["Accessing competitor profile..."];
+
+			const updateStatus = (status: string) => {
+				currentStatuses = [...currentStatuses, status];
+				setToolCallStatus(currentStatuses);
+			};
 
 			pythonProcess.stdout.on('data', (data) => {
 				stdoutData += data.toString();
@@ -253,30 +311,60 @@ const App = () => {
 					try {
 						const competitorData = JSON.parse(stdoutData);
 						if (!competitorData.reviews || competitorData.reviews.length === 0) {
-							setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: No reviews found for ${competitorName} in ${location}. Check the name or try another area.` }]);
+							updateStatus(`No reviews found.`);
+							setHistory(prev => [
+								...prev,
+								{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+								{ sender: 'agent', content: `Tanner AI: No reviews found for ${competitorName} in ${location}. Check the name or try another area.` }
+							]);
 						} else {
-							setToolCallStatus(prev => [...prev, `Collected ${competitorData.reviews.length} reviews. Identifying market vulnerabilities...`]);
+							updateStatus(`Collected ${competitorData.reviews.length} reviews. Identifying market vulnerabilities...`);
 							const analysis = await analyzeCompetitor(competitorData);
-							setHistory(prev => [...prev, { sender: 'agent', content: analysis }]);
-							setToolCallStatus(prev => [...prev, `Analysis report generated in ${timeTakenString}.`]);
+							updateStatus(`Analysis report generated in ${timeTakenString}.`);
+							
+							setHistory(prev => [
+								...prev,
+								{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+								{ sender: 'agent', content: analysis }
+							]);
 						}
 					} catch (e) {
-						setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }]);
-						setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
+						updateStatus(`Failed in ${timeTakenString}.`);
+						setHistory(prev => [
+							...prev,
+							{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+							{ sender: 'agent', content: `Tanner AI: Error parsing reviews. Raw output: ${stdoutData}` }
+						]);
 					}
 				} else {
-					setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error during competitor extraction (exit code ${code}).\n${stderrData}` }]);
-					setToolCallStatus(prev => [...prev, `Failed in ${timeTakenString}.`]);
+					updateStatus(`Failed in ${timeTakenString}.`);
+					setHistory(prev => [
+						...prev,
+						{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: currentStatuses },
+						{ sender: 'agent', content: `Tanner AI: Error during competitor extraction (exit code ${code}).\n${stderrData}` }
+					]);
 				}
+				setActiveToolCall(null);
+				setToolCallStatus([]);
 				setIsProcessing(false);
 			});
 		} else if (intent === 'generate_content' && contentRequest) {
-			setActiveToolCall({ name: "Generating Marketing Content", query: contentRequest });
-			setToolCallStatus(prev => [...prev, "Reading cache..."]);
+			const toolName = "Generating Marketing Content";
+			const toolQuery = contentRequest;
+			
+			setActiveToolCall({ name: toolName, query: toolQuery });
+			setToolCallStatus(["Reading cache..."]);
 			
 			const content = await generateMarketingContent(contentRequest);
-			setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI:\n${content}` }]);
-			setToolCallStatus(prev => [...prev, "Content generated successfully."]);
+			
+			setHistory(prev => [
+				...prev,
+				{ sender: 'tool', toolCall: { name: toolName, query: toolQuery }, status: ["Reading cache...", "Content generated successfully."] },
+				{ sender: 'agent', content: `Tanner AI:\n${content}` }
+			]);
+			
+			setActiveToolCall(null);
+			setToolCallStatus([]);
 			setIsProcessing(false);
 		} else if (intent === 'error') {
 			setHistory(prev => [...prev, { sender: 'agent', content: `Tanner AI: Error: ${detail}` }]);
@@ -331,7 +419,7 @@ const App = () => {
 			<ChatHistory history={history} />
 			<Box flexGrow={1} />
 			{activeToolCall && <ToolCallDisplay toolCall={activeToolCall} status={toolCallStatus} />}
-			{isProcessing && <Processing />}
+			{isProcessing && <Processing message={processingMessage} />}
 			<InputBox
 				value={inputValue}
 			/>
