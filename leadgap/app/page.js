@@ -23,6 +23,13 @@ export default function Main() {
       {/* ─── HERO ─────────────────────────────────────────────────────────── */}
       <div className="relative min-h-screen w-full flex flex-col overflow-hidden">
 
+      <img
+        src="/hero.png"
+        className="absolute top-0 left-0 pointer-events-none select-none"
+        style={{ width: "100vw", height: "100vh", display: "block" }}
+        aria-hidden="true"
+      />
+
         {/* Navbar */}
         <nav className="relative z-10 flex items-center justify-between px-8 py-6 w-full">
           {/* Logo */}
@@ -83,7 +90,7 @@ export default function Main() {
         </nav>
 
         {/* Hero Content */}
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 pb-24">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 pb-10 mt-15">
           {/* Badge pill */}
           <div
             className="mb-4 px-5 py-1.5 rounded-full text-white/85 text-md"
@@ -153,13 +160,24 @@ export default function Main() {
               How it works
             </button>
           </div>
+          
+          {/* Added App Preview Image */}
+          <div className="mt-8">
+            <img
+              src="/app-preview.png"
+              alt="LeadGap App Preview"
+              width={992}
+              height={600}
+              priority // Added priority for critical image loading
+            />
+          </div>
         </div>
       </div>
       {/* ─── END HERO ─────────────────────────────────────────────────────── */}
 
 
       {/* ─── FEATURES ─────────────────────────────────────────────────────── */}
-      <section className="bg-[#010409] px-8 py-16">
+      <section className="bg-[#010409] px-8 py-10"> {/* Increased padding */}
         <div
           className="mx-auto max-w-[1250px]"
           style={{ border: "1px solid #1F1F1F" }}
