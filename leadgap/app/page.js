@@ -288,7 +288,7 @@ export default function Main() {
               LeadGap is an AI-powered market intelligence engine for local businesses and sales teams — enter a niche or competitor and get surgical vulnerability reports, market gap analysis, and precision ad copy, so you can outplay your rivals and close more deals without doing hours of manual research.
               </h3>
               <h2 className="text-xl tracking-tight w-max font-medium mt-1">
-                Create once. Grow everywhere. Powered by one — You + LeadGap
+                Intelligent Insights. Grow everywhere. Powered by one — You + LeadGap
               </h2>
               <h2 className="text-sm w-max font-medium tracking-tight text-white/80 mt-3">
                 Hey there 👋 I’m Rao, the maker of LeadGap. Feel free to check out my work over on Twitter
