@@ -1,3 +1,5 @@
+'use client';
+
 const steps = [
   {
     title: "Targeted Market Data Extraction",
@@ -35,8 +37,14 @@ const features = [
 ];
 
 export default function Main() {
+  const handleNavClick = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
-    <div className="bg-[#010409] flex flex-col">
+    <div id="home" className="bg-[#010409] flex flex-col">
 
       {/* ─── HERO ─────────────────────────────────────────────────────────── */}
       <div className="relative min-h-screen w-full flex flex-col overflow-hidden">
@@ -163,7 +171,7 @@ export default function Main() {
 
 
       {/* ─── FEATURES ─────────────────────────────────────────────────────── */}
-      <section className="bg-[#010409] px-8 py-10">
+      <section id="features" className="bg-[#010409] px-8 py-10">
         <div className="mx-auto max-w-[1250px]" style={{ border: "1px solid #1F1F1F" }}>
           <div className="px-8 py-8" style={{ borderBottom: "1px solid #1F1F1F" }}>
             <h2 className="text-white" style={{ fontSize: "39px", fontWeight: 600, letterSpacing: "-0.055em", lineHeight: "107%" }}>
@@ -192,7 +200,7 @@ export default function Main() {
 
 
       {/* ─── PROCESS ──────────────────────────────────────────────────────── */}
-      <section className="bg-[#010409] px-8 py-16">
+      <section id="how-it-works" className="bg-[#010409] px-8 py-16">
         <div className="mx-auto max-w-[1250px]">
 
           {/* Section header */}
@@ -269,6 +277,56 @@ export default function Main() {
         </div>
       </section>
       {/* ─── END PROCESS ──────────────────────────────────────────────────── */}
+
+      <footer id="about" className="relative overflow-hidden bg-[#010409] pt-12 pb-24 px-6 w-screen text-white text-sm">
+          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-start gap-10 lg:gap-24">
+            
+            {/* Left Side: Image + Text */}
+            <div className="flex flex-col gap-2 max-w-sm">
+              <img src="/BlackLogo.png" alt="LeadGap" className="w-28 h-auto mb-2 cursor-pointer" />
+              <h3 className="text-base w-[520px] font-medium tracking-tight leading-6 text-white/85">
+              LeadGap is an AI-powered market intelligence engine for local businesses and sales teams — enter a niche or competitor and get surgical vulnerability reports, market gap analysis, and precision ad copy, so you can outplay your rivals and close more deals without doing hours of manual research.
+              </h3>
+              <h2 className="text-xl tracking-tight w-max font-medium mt-1">
+                Create once. Grow everywhere. Powered by one — You + LeadGap
+              </h2>
+              <h2 className="text-sm w-max font-medium tracking-tight text-white/80 mt-3">
+                Hey there 👋 I’m Rao, the maker of LeadGap. Feel free to check out my work over on Twitter
+              </h2>
+            </div>
+
+            {/* Right Side: Two Columns */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 w-full max-w-2xl">
+              {/* Column 1 */}
+              <div>
+                <h1 className="text-base font-medium mb-2">Links</h1>
+                <ul className="space-y-1">
+                  <li><button onClick={() => handleNavClick('home')} className="text-white/70 font-medium hover:text-white transition-colors cursor-pointer">Home</button></li>
+                  <li><button onClick={() => handleNavClick('features')} className="text-white/70 font-medium hover:text-white transition-colors cursor-pointer">Features</button></li>
+                  <li><button onClick={() => handleNavClick('how-it-works')} className="text-white/70 font-medium hover:text-white transition-colors cursor-pointer">How it Works</button></li>
+                  <li><button onClick={() => handleNavClick('about')} className="text-white/70 font-medium hover:text-white transition-colors cursor-pointer">About Us</button></li>
+                </ul>
+              </div>
+
+              {/* Column 2 */}
+              <div>
+                <h1 className="text-base font-medium mb-2">More</h1>
+                <ul className="space-y-1">
+                  <li><a href="https://twitter.com/getrepliq" target="_blank" rel="noopener noreferrer" className="text-white/70 font-medium hover:text-white transition-colors cursor-pointer">Follow on Twitter</a></li>
+                  <li><a href="https://instagram.com/getrepliq" target="_blank" rel="noopener noreferrer" className="text-white/70 font-medium hover:text-white transition-colors cursor-pointer">Follow on Instagram</a></li>
+                  <li><a href="https://twitter.com/heyspecterr" target="_blank" rel="noopener noreferrer" className="text-white/70 font-medium hover:text-white transition-colors cursor-pointer">Creator</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Decorative footer mark (clipped) */}
+          <img
+            src="/repliq-logo.png"
+            aria-hidden="true"
+            className="pointer-events-none select-none absolute right-[180px] bottom-[-70px] w-[252px] opacity-60"
+          />
+        </footer>
 
     </div>
   );
