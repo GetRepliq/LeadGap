@@ -14,6 +14,10 @@
   /* Typography settings */
   --font-heading: var(--font-geist-sans);
   --font-body: var(--font-geist-sans);
+
+  /* JetBrains Mono — agent page */
+  --font-agent-heading: var(--font-jetbrains-mono);
+  --font-agent-body: var(--font-jetbrains-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,7 +36,7 @@ body {
   font-feature-settings: "rlig" 0, "calt" 0;
 }
 
-/* Typography classes */
+/* ── Geist typography classes (landing page) ── */
 .heading-semibold {
   @apply font-semibold tracking-[-0.06em];
 }
@@ -47,4 +51,18 @@ body {
 
 .section-subheading {
   @apply font-normal tracking-[-0.025em];
+}
+
+/* ── JetBrains Mono typography classes (agent page) ── */
+.agent-heading {
+  font-family: var(--font-jetbrains-mono), monospace;
+  letter-spacing: -0.10em;
+  font-weight: 600;
+}
+
+.agent-subheading {
+  font-family: var(--font-jetbrains-mono), monospace;
+  letter-spacing: -0.05em;
+  font-weight: 500;
+  line-height: 145%;
 }

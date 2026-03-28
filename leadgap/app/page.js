@@ -1,5 +1,7 @@
 'use client';
 
+import Link from "next/link";
+
 const steps = [
   {
     title: "Targeted Market Data Extraction",
@@ -141,12 +143,13 @@ export default function Main() {
           </p>
 
           <div className="flex items-center gap-4">
-            <button
+            <Link
+              href="/webapp"
               className="px-7 py-2 rounded-full bg-white text-[#010409] text-md font-medium hover:bg-white/90 transition-colors duration-200 cursor-pointer"
               style={{ letterSpacing: "-0.035em" }}
             >
               Try for free
-            </button>
+            </Link>
             <button
               className="px-7 py-2 rounded-full text-white text-md font-medium transition-all duration-200 cursor-pointer"
               style={{
