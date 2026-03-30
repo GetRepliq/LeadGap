@@ -16,7 +16,7 @@ export default function AgentPage() {
       {/* Outer frame */}
       <div
         className="flex-1 flex flex-col mx-auto w-full max-w-[1200px] my-8 overflow-hidden"
-        style={{ background: "#0d0d0d", border: "1px solid rgba(255, 255, 255, 0.55)" }}
+        style={{ border: "1px solid rgba(255, 255, 255, 0)" }}
       >
 
         {/* ── Main content area ── */}
@@ -33,7 +33,7 @@ export default function AgentPage() {
           {/* Greeting */}
           <p
             className="agent-subheading mb-1"
-            style={{ fontSize: "22px", color: "rgba(255, 255, 255, 0.55)" }}
+            style={{ fontSize: "28px", color: "rgba(255, 255, 255, 0.55)" }}
           >
             Hi Dean Winchester
           </p>
@@ -55,10 +55,10 @@ export default function AgentPage() {
           <p
             className="agent-subheading"
             style={{
-              fontSize: "13px",
+              fontSize: "15px",
               color: "rgba(255, 255, 255, 0.55)",
-              lineHeight: "160%",
-              maxWidth: "420px",
+              lineHeight: "130%",
+              maxWidth: "470px",
             }}
           >
             I&apos;m ready to analyze market reviews, identify competitor
@@ -69,43 +69,51 @@ export default function AgentPage() {
 
         {/* ── Input bar — pinned to bottom ── */}
         <div className="px-8 pb-8">
-          <div
-            className="flex items-center gap-3 w-full mx-auto px-5 py-4"
-            style={{
-              maxWidth: "600px",
-              background: "transparent",
-              border: "1px solid rgba(255, 255, 255, 0.55)",
-            }}
-          >
-            {/* Arrow prompt */}
-            <span
-              className="agent-subheading"
-              style={{ color: "rgba(255, 255, 255, 0.55)", fontSize: "14px", flexShrink: 0 }}
-            >
-              →
-            </span>
-
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Analyze Cafes in London ..."
-              className="agent-subheading flex-1 bg-transparent outline-none"
+          {/* Container to handle alignment for both elements */}
+          <div className="mx-auto" style={{ maxWidth: "600px" }}>
+            
+            {/* Input Bar */}
+            <div
+              className="flex items-center gap-3 w-full px-5 py-2"
               style={{
-                fontSize: "14px",
-                color: "rgba(255, 255, 255, 0.55)",
-                caretColor: "#4a9eff",
+                background: "transparent",
+                border: "1px solid rgba(255, 255, 255, 0.55)",
               }}
-            />
-          </div>
+            >
+              {/* Arrow prompt */}
+              <span
+                className="agent-subheading"
+                style={{ color: "rgba(255, 255, 255, 0.55)", fontSize: "14px", flexShrink: 0 }}
+              >
+                →
+              </span>
 
-          {/* Status bar */}
-          <p
-            className="agent-subheading text-center mt-3"
-            style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.55)" }}
-          >
-            &gt; Engine: Gemini-3-flash | Context Memory: 15% used | Status: Optimized
-          </p>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Analyze Cafes in London ..."
+                className="agent-subheading flex-1 bg-transparent outline-none"
+                style={{
+                  fontSize: "14px",
+                  color: "rgba(255, 255, 255, 0.55)",
+                  caretColor: "#4a9eff",
+                }}
+              />
+            </div>
+
+            {/* Status bar - Now inside the 600px max-width wrapper */}
+            <p
+              className="agent-subheading mt-3"
+              style={{ 
+                fontSize: "13px", 
+                color: "rgba(255, 255, 255, 0.30)", 
+                textAlign: "left" 
+              }}
+            >
+              &gt; Engine: Gemini-3-flash | Context Memory: 15% used | Status: Optimized
+            </p>
+          </div>
         </div>
 
       </div>
