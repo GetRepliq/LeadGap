@@ -13,7 +13,7 @@ Data Preprocessing & NLP Signal Extraction:
      ☐ Use NLP or LLMs for Pain Point and market gap detection using language patterns
 
 Serviec Gap & Strategy Mapping:
-     ☐ Suppy-Demand Detection for currently faced pain points
+     ☐ Supply-Demand Detection for currently faced pain points
      ☐ Ranks processed service gaps based on opportunity size, urgency and conversion rates
      ☐ Convert model outputs into recommendations and small set of high-confidence actions
 
@@ -43,3 +43,22 @@ Automated Ad Copy Generation:
      ✔ Create LLM prompt templates for landing page content @done(26-03-17 17:27)
      ✔ Agent tool to trigger content generation from service gap data @done(26-03-16 16:07)
      ☐ Present generated ad/web content to the user for copy-pasting
+
+Vercel Serverless Backend:
+     ☐ Create Next.js API routes for agent communication
+     ☐ Setup Vercel environment variables for Gemini and other keys
+     ☐ Implement API orchestration for multi-step agent tasks
+     ☐ Configure serverless function timeouts and resource limits
+
+Agent Migration & Backend System:
+     ☐ Migrate core logic from @cli/core/ to new backend directory
+     ☐ Adapt Node.js agent for web-based JSON responses instead of TUI
+     ☐ Port Python scraping and memory scripts to serverless environment
+     ☐ Setup headless Chromium/Selenium for serverless scraping
+     ☐ Configure Python dependency management for Vercel deployment
+
+Supabase Database Integration:
+     ☐ Initialize Supabase project and PostgreSQL database schema
+     ☐ Replace market_info.json file cache with Supabase tables
+     ☐ Implement Supabase client in Node.js (API routes) and Python
+     ☐ Build persistence layer for user research history and analysis cards
