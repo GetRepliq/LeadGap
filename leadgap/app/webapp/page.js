@@ -114,26 +114,112 @@ export default function AgentPage() {
                 fontSize: "14px",
               }}
             >
-              <h3 className="font-bold mb-2">Agent Response:</h3>
-              {response.intent && (
-                <p><strong>Intent:</strong> <span style={{ color: '#4a9eff' }}>{response.intent}</span></p>
-              )}
-              {response.searchQuery && (
-                <p><strong>Search Query:</strong> {response.searchQuery}</p>
-              )}
-              {response.competitorName && (
-                <p><strong>Competitor:</strong> {response.competitorName}</p>
-              )}
-              {response.location && (
-                <p><strong>Location:</strong> {response.location}</p>
-              )}
-              {response.contentRequest && (
-                <p><strong>Content Request:</strong> {response.contentRequest}</p>
-              )}
               {response.error && (
-                <p style={{ color: 'red' }}><strong>Error:</strong> {response.error}</p>
+                <div style={{ color: 'red', fontWeight: 'bold' }}>
+                  <h3>Error:</h3>
+                  <p>{response.error}</p>
+                </div>
               )}
-              <h4 className="font-bold mt-4 mb-1">Raw JSON:</h4>
+
+              {response.rawJson && response.rawJson.businesses && (
+                <>
+                  <h3 className="font-bold mb-2 text-lg" style={{ color: "#e0e0e0" }}>Market Analysis:</h3>
+                  {response.rawJson.businesses.map((business, bIndex) => (
+                    <div key={bIndex} className="mb-4 p-3 bg-gray-900 rounded">
+                      <h4 className="font-bold text-md" style={{ color: "#4a9eff" }}>{business.business_name || 'Unknown Business'}</h4>
+                      <p><strong>Summary:</strong> {business.summary || 'N/A'}</p>
+                      {business.positive_remarks && business.positive_remarks.length > 0 && (
+                        <p><strong>Positive Remarks:</strong> {business.positive_remarks.join(', ')}</p>
+                      )}
+                      {business.actionable_complaints && business.actionable_complaints.length > 0 && (
+                        <div>
+                          <p><strong>Actionable Complaints:</strong></p>
+                          <ul className="list-disc list-inside ml-2">
+                            {business.actionable_complaints.map((comp, cIndex) => (
+                              <li key={cIndex}>
+                                {comp.complaint} (Frustration: {comp.frustration_intensity || 'N/A'})
+                                {comp.source_quote && <span className="italic"> - "[{comp.source_quote}]"</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {business.buying_intent && (
+                        <p><strong>Buying Intent Detected:</strong> {business.buying_intent.detected ? `Yes - ${business.buying_intent.explanation}` : 'No'}</p>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {response.card && (
+                <>
+                  <h3 className="font-bold mb-2 text-lg" style={{ color: "#e0e0e0" }}>Competitor Battle Card:</h3>
+                  <div className="mb-4 p-3 bg-gray-900 rounded">
+                    <h4 className="font-bold text-md" style={{ color: "#4a9eff" }}>{response.card.competitor_name || 'Unknown Competitor'}</h4>
+                    <p><strong>Market Position:</strong> {response.card.market_position || 'N/A'}</p>
+                    <p><strong>Customer Frustration Level:</strong> {response.card.customer_frustration_level || 'N/A'}</p>
+                    {response.business_info && (
+                      <div className="mt-2">
+                        <p className="font-bold">Contact Info:</p>
+                        <ul className="list-disc list-inside ml-2">
+                          <li>Website: {response.business_info.website || 'N/A'}</li>
+                          <li>Phone: {response.business_info.phone || 'N/A'}</li>
+                          <li>Address: {response.business_info.address || 'N/A'}</li>
+                        </ul>
+                      </div>
+                    )}
+                    {response.card.key_vulnerabilities && response.card.key_vulnerabilities.length > 0 && (
+                      <div className="mt-2">
+                        <p className="font-bold">Key Vulnerabilities:</p>
+                        <ul className="list-disc list-inside ml-2">
+                          {response.card.key_vulnerabilities.map((v, vIndex) => (
+                            <li key={vIndex}>
+                              {v.issue}
+                              {v.source_review && <span className="italic"> - "[{v.source_review}]"</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="mt-2"><strong>Conversion Strategy Hook:</strong> <span className="italic">"{response.card.conversion_strategy_hook || 'N/A'}"</span></p>
+                    <p className="mt-2"><strong>Strategic Recommendations:</strong> {response.card.strategic_recommendations || 'N/A'}</p>
+                  </div>
+                </>
+              )}
+
+              {response.content && (
+                <>
+                  <h3 className="font-bold mb-2 text-lg" style={{ color: "#e0e0e0" }}>Generated Marketing Content:</h3>
+                  <div className="mb-4 p-3 bg-gray-900 rounded">
+                    <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{response.content}</pre>
+                  </div>
+                </>
+              )}
+
+              {response.intent && !response.rawJson && !response.card && !response.content && (
+                <>
+                  <h3 className="font-bold mb-2 text-lg" style={{ color: "#e0e0e0" }}>Intent Classification:</h3>
+                  <p><strong>Intent:</strong> <span style={{ color: '#4a9eff' }}>{response.intent}</span></p>
+                  {response.searchQuery && (
+                    <p><strong>Search Query:</strong> {response.searchQuery}</p>
+                  )}
+                  {response.competitorName && (
+                    <p><strong>Competitor:</strong> {response.competitorName}</p>
+                  )}
+                  {response.location && (
+                    <p><strong>Location:</strong> {response.location}</p>
+                  )}
+                  {response.contentRequest && (
+                    <p><strong>Content Request:</strong> {response.contentRequest}</p>
+                  )}
+                  {response.message && (
+                    <p><strong>Message:</strong> {response.message}</p>
+                  )}
+                </>
+              )}
+              
+              <h4 className="font-bold mt-8 mb-1">Raw JSON (for debugging):</h4>
               <pre>{JSON.stringify(response, null, 2)}</pre>
             </div>
           )}
