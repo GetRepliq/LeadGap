@@ -4,6 +4,39 @@ import { useState } from "react";
 
 export default function AgentPage() {
   const [input, setInput] = useState("");
+  const [response, setResponse] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!input.trim() || loading) return;
+
+    setLoading(true);
+    setResponse(null); // Clear previous response
+    try {
+      const apiResponse = await fetch('/api/agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: input }),
+      });
+
+      const data = await apiResponse.json();
+      setResponse(data); // Store the raw JSON response
+      console.log('API Response:', data);
+    } catch (error) {
+      console.error('Frontend Fetch Error:', error);
+      setResponse({ error: error.message || "An unknown error occurred." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit();
+    }
+  };
 
   return (
     <div
@@ -65,6 +98,26 @@ export default function AgentPage() {
             weaknesses, and build your winning strategy. What gap should we
             bridge today?
           </p>
+
+          {/* API Response Display (for debugging) */}
+          {loading && (
+            <div className="mt-8 text-white">Loading...</div>
+          )}
+          {response && (
+            <div
+              className="mt-8 p-4 bg-gray-800 rounded text-left"
+              style={{
+                maxWidth: "600px",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                color: "rgba(255, 255, 255, 0.7)",
+                fontSize: "14px",
+              }}
+            >
+              <h3 className="font-bold mb-2">API Response:</h3>
+              <pre>{JSON.stringify(response, null, 2)}</pre>
+            </div>
+          )}
         </div>
 
         {/* ── Input bar — pinned to bottom ── */}
@@ -92,14 +145,30 @@ export default function AgentPage() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Analyze Cafes in London ..."
+                onKeyPress={handleKeyPress}
+                placeholder={loading ? "Thinking..." : "Analyze Cafes in London ..."}
                 className="agent-subheading flex-1 bg-transparent outline-none"
                 style={{
                   fontSize: "14px",
                   color: "rgba(255, 255, 255, 0.55)",
                   caretColor: "#4a9eff",
                 }}
+                disabled={loading}
               />
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                style={{
+                  background: "transparent",
+                  border: "1px solid rgba(255, 255, 255, 0.55)",
+                  color: "rgba(255, 255, 255, 0.55)",
+                  padding: "4px 8px",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  fontSize: "12px",
+                }}
+              >
+                Send
+              </button>
             </div>
 
             {/* Status bar - Now inside the 600px max-width wrapper */}
@@ -111,7 +180,7 @@ export default function AgentPage() {
                 textAlign: "left" 
               }}
             >
-              &gt; Engine: Gemini-3-flash | Context Memory: 15% used | Status: Optimized
+              &gt; Engine: Gemini-3-flash | Context Memory: 15% used | Status: {loading ? "Processing..." : "Optimized"}
             </p>
           </div>
         </div>

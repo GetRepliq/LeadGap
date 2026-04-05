@@ -45,14 +45,14 @@ Automated Ad Copy Generation:
      ☐ Present generated ad/web content to the user for copy-pasting
 
 Vercel Serverless Backend:
-     ⏳ Create Next.js API routes for agent communication @inprogress(26-04-05 11:00)
+     ✔ Create Next.js API routes for agent communication @done(26-04-05 11:11)
      ⏳ Setup Vercel environment variables for Gemini and other keys @inprogress(26-04-05 11:00)
      ☐ Implement API orchestration for multi-step agent tasks
      ☐ Configure serverless function timeouts and resource limits
 
 Agent Migration & Backend System:
-     ⏳ Migrate core logic from @cli/core/ to new backend directory @inprogress(26-04-05 11:00)
-     ⏳ Adapt Node.js agent for web-based JSON responses instead of TUI @inprogress(26-04-05 11:00)
+     ✔ Migrate core logic from @cli/core/ to new backend directory @done(26-04-05 11:11)
+     ✔ Adapt Node.js agent for web-based JSON responses instead of TUI @done(26-04-05 11:11)
      ☐ Port Python scraping and memory scripts to serverless environment
      ☐ Setup headless Chromium/Selenium for serverless scraping
      ☐ Configure Python dependency management for Vercel deployment
