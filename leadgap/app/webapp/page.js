@@ -114,7 +114,26 @@ export default function AgentPage() {
                 fontSize: "14px",
               }}
             >
-              <h3 className="font-bold mb-2">API Response:</h3>
+              <h3 className="font-bold mb-2">Agent Response:</h3>
+              {response.intent && (
+                <p><strong>Intent:</strong> <span style={{ color: '#4a9eff' }}>{response.intent}</span></p>
+              )}
+              {response.searchQuery && (
+                <p><strong>Search Query:</strong> {response.searchQuery}</p>
+              )}
+              {response.competitorName && (
+                <p><strong>Competitor:</strong> {response.competitorName}</p>
+              )}
+              {response.location && (
+                <p><strong>Location:</strong> {response.location}</p>
+              )}
+              {response.contentRequest && (
+                <p><strong>Content Request:</strong> {response.contentRequest}</p>
+              )}
+              {response.error && (
+                <p style={{ color: 'red' }}><strong>Error:</strong> {response.error}</p>
+              )}
+              <h4 className="font-bold mt-4 mb-1">Raw JSON:</h4>
               <pre>{JSON.stringify(response, null, 2)}</pre>
             </div>
           )}
