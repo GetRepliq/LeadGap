@@ -103,7 +103,10 @@ export default function AgentPage() {
         </div>
 
         {/* ── Results Area ── */}
-        <div className={`flex flex-col transition-opacity duration-700 ${!response && !loading ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
+        <div 
+          className={`flex flex-col transition-opacity duration-700 ${!response && !loading ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}
+          style={{ letterSpacing: "-0.035em", lineHeight: "1.3" }}
+        >
           {response && (
             <div className="space-y-6 mb-8">
               {/* Market Analysis View */}
@@ -186,11 +189,11 @@ export default function AgentPage() {
 
       {/* ── Input Bar (Pinned to Bottom) ── */}
       <div className="w-full max-w-[900px] mx-auto px-6 pb-12">
-        <div className="mx-auto" style={{ maxWidth: "600px" }}>
+        <div className="mx-auto" style={{ maxWidth: "800px" }}>
           
           {/* ── Status Logs (Moved here to stay above input) ── */}
           {(logs.length > 0 || loading) && (
-            <div className="pb-4 space-y-1">
+            <div className="pb-4 space-y-1" style={{ letterSpacing: "-0.045em", lineHeight: "1.3" }}>
               {logs.map((log, i) => (
                 <div key={i} className={`flex gap-2 ${i === 0 ? "text-blue-400" : "opacity-60 pl-4"}`}>
                   {i > 0 && <span>└</span>}
@@ -213,7 +216,7 @@ export default function AgentPage() {
           )}
 
           <div
-            className="flex items-center gap-3 w-full px-5 py-2"
+            className="flex items-center gap-3 w-full px-4 py-2"
             style={{
               background: "transparent",
               border: "1px solid rgba(255, 255, 255, 0.55)",
@@ -240,20 +243,6 @@ export default function AgentPage() {
               }}
               disabled={loading}
             />
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              style={{
-                background: "transparent",
-                border: "1px solid rgba(255, 255, 255, 0.55)",
-                color: "rgba(255, 255, 255, 0.55)",
-                padding: "4px 8px",
-                cursor: loading ? "not-allowed" : "pointer",
-                fontSize: "12px",
-              }}
-            >
-              Send
-            </button>
           </div>
 
           <p
