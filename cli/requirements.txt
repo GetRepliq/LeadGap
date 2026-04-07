@@ -2,3 +2,5 @@ requests
 python-dotenv
 crawl4ai
 google-genai
+selenium
+webdriver-manager

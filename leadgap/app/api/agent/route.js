@@ -1,30 +1,5 @@
-import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory } from '../../../lib/agent-functions';
+import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory, scrapeReviews } from '../../../lib/agent-functions';
 
-// Dummy data for scraping until Stage 4 is implemented
-const dummyScrapedReviews = [
-  { business_name: "Austin Plumbing Pro", stars: "5.0 stars", numerical_stars: 5, text: "Excellent service! Fixed my leak quickly and professionally. Highly recommend." },
-  { business_name: "Austin Plumbing Pro", stars: "4.0 stars", numerical_stars: 4, text: "Good work, but took a bit longer than expected. Price was fair." },
-  { business_name: "Austin Plumbing Pro", stars: "2.0 stars", numerical_stars: 2, text: "Had a terrible experience. Plumber was late and didn't fix the issue completely. Very frustrating." },
-  { business_name: "Reliable Pipes Inc.", stars: "4.5 stars", numerical_stars: 4.5, text: "Always on time and very transparent with pricing. Our go-to for all plumbing needs." },
-  { business_name: "Reliable Pipes Inc.", stars: "3.0 stars", numerical_stars: 3, text: "Okay service, but their communication could be better. Had to call multiple times for updates." },
-  { business_name: "QuickFix Plumbing", stars: "1.0 stars", numerical_stars: 1, text: "Absolutely avoid! Overcharged and the problem came back within a week. Horrible customer service." },
-  { business_name: "QuickFix Plumbing", stars: "5.0 stars", numerical_stars: 5, text: "Fast and efficient. Saved us from a major flood. Lifesavers!" },
-];
-
-const dummyCompetitorData = {
-  business_info: {
-    name: "Competitor Plumbing Co.",
-    website: "https://www.competitorplumbing.com",
-    phone: "555-123-4567",
-    address: "123 Main St, Austin, TX"
-  },
-  reviews: [
-    { business_name: "Competitor Plumbing Co.", stars: "1.0 stars", numerical_stars: 1, text: "Worst service ever. They left a huge mess and charged a fortune." },
-    { business_name: "Competitor Plumbing Co.", stars: "2.0 stars", numerical_stars: 2, text: "Took forever to respond and when they did, they cancelled last minute." },
-    { business_name: "Competitor Plumbing Co.", stars: "4.0 stars", numerical_stars: 4, text: "Decent work, but the scheduling was a nightmare. Always late." },
-    { business_name: "Competitor Plumbing Co.", stars: "5.0 stars", numerical_stars: 5, text: "The actual plumbing work was great, but the customer service is nonexistent." },
-  ]
-};
 
 export async function POST(request) {
   const { message } = await request.json();
@@ -38,18 +13,42 @@ export async function POST(request) {
 
     switch (intentResult.intent) {
       case 'extract_reviews':
-        // For now, use dummy data. Stage 4 will integrate actual scraping.
-        const scrapedReviews = dummyScrapedReviews;
-        agentResponse = await analyzeReviews(scrapedReviews);
-        // Also update memory with the raw analysis (if successful)
-        if (agentResponse && agentResponse.rawJson) {
+        console.log('Intent: extract_reviews - Initiating scraping...');
+        const scrapedNicheReviews = await scrapeReviews({
+          searchQuery: intentResult.searchQuery,
+          mode: "niche",
+        });
+
+        if (scrapedNicheReviews.error) {
+          agentResponse = { error: `Scraping error: ${scrapedNicheReviews.error}` };
+        } else if (scrapedNicheReviews.length === 0) {
+          agentResponse = { message: "No reviews found for the specified niche. Please try a different search query." };
+        } else {
+          console.log(`Scraped ${scrapedNicheReviews.length} reviews. Analyzing...`);
+          agentResponse = await analyzeReviews(scrapedNicheReviews);
+          // Also update memory with the raw analysis (if successful)
+          if (agentResponse && agentResponse.rawJson) {
             await updateMemory(agentResponse.rawJson, intentResult.searchQuery || message);
+          }
         }
         break;
       case 'competitor_analysis':
-        // For now, use dummy data. Stage 4 will integrate actual scraping.
-        const competitorData = dummyCompetitorData; // Or use intentResult.competitorName/location
-        agentResponse = await analyzeCompetitor(competitorData);
+        console.log('Intent: competitor_analysis - Initiating scraping for competitor...');
+        const scrapedCompetitorData = await scrapeReviews({
+          searchQuery: `${intentResult.competitorName} in ${intentResult.location}`, // Python script expects this format for the query argument
+          mode: "competitor",
+          competitorName: intentResult.competitorName,
+          location: intentResult.location,
+        });
+
+        if (scrapedCompetitorData.error) {
+          agentResponse = { error: `Scraping error: ${scrapedCompetitorData.error}` };
+        } else if (!scrapedCompetitorData.business_info || scrapedCompetitorData.reviews.length === 0) {
+          agentResponse = { message: `No data found for competitor "${intentResult.competitorName}" in "${intentResult.location}". Please check the name and location.` };
+        } else {
+          console.log(`Scraped data for competitor "${intentResult.competitorName}". Analyzing...`);
+          agentResponse = await analyzeCompetitor(scrapedCompetitorData);
+        }
         break;
       case 'generate_content':
         if (!intentResult.contentRequest) {

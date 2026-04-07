@@ -397,3 +397,81 @@ Format the output clearly for a terminal display. Use bold headers and bullet po
     return { error: `Error generating content: ${error.message}` };
   }
 }
+
+export async function scrapeReviews({
+  searchQuery,
+  mode = "niche", // "niche" or "competitor"
+  competitorName = null,
+  location = null,
+  maxBusinesses = 3,
+  reviewsPerBusiness = 10,
+  minStars = 1,
+  maxStars = 5,
+}) {
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const pythonScriptPath = path.resolve(currentDir, '../../cli/core', 'utils.py');
+
+  if (!fs.existsSync(pythonScriptPath)) {
+    const errorMsg = `[scraper] Error: Python scraping script not found at ${pythonScriptPath}`;
+    console.error(errorMsg);
+    return { error: errorMsg };
+  }
+
+  const args = [
+    pythonScriptPath,
+    searchQuery,
+    "--mode", mode,
+    "--max_businesses", maxBusinesses.toString(),
+    "--reviews_per_business", reviewsPerBusiness.toString(),
+    "--min_stars", minStars.toString(),
+    "--max_stars", maxStars.toString(),
+  ];
+
+  if (mode === "competitor") {
+    if (!location) {
+      return { error: "[scraper] Location is required for competitor mode." };
+    }
+    // For competitor mode, searchQuery is the competitorName
+    args[1] = competitorName; 
+    args.push("--location", location);
+  }
+
+  return new Promise((resolve, reject) => {
+    // console.log(`[scraper] Spawning python process: python3 ${args.join(' ')}`);
+    const pythonProcess = spawn('python3', args);
+
+    let stdoutData = '';
+    let stderrData = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      stdoutData += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      stderrData += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const parsedData = JSON.parse(stdoutData);
+          resolve(parsedData);
+        } catch (parseError) {
+          console.error('[scraper] Error parsing Python script JSON output:', parseError);
+          console.error('[scraper] Raw stdout:', stdoutData);
+          console.error('[scraper] Raw stderr:', stderrData);
+          reject(new Error(`[scraper] Failed to parse Python script output: ${parseError.message}`));
+        }
+      } else {
+        const errorMsg = `[scraper] Python script exited with code ${code}.\nStderr: ${stderrData.trim()}\nStdout: ${stdoutData.trim()}`;
+        console.error(errorMsg);
+        reject(new Error(errorMsg));
+      }
+    });
+
+    pythonProcess.on('error', (err) => {
+      console.error('[scraper] Failed to start Python subprocess:', err);
+      reject(new Error(`[scraper] Failed to start Python subprocess: ${err.message}`));
+    });
+  });
+}

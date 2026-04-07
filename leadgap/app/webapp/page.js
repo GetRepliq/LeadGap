@@ -7,6 +7,8 @@ export default function AgentPage() {
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [startTime, setStartTime] = useState(0); // New state for start time
+  const [duration, setDuration] = useState(0); // New state for duration
 
   const handleSubmit = async () => {
     if (!input.trim() || loading) return;
@@ -14,6 +16,7 @@ export default function AgentPage() {
     setLoading(true);
     setResponse(null);
     setLogs([]);
+    // setStartTime(Date.now()); // Moved to handleKeyPress
 
     // Initial logs
     setLogs([
@@ -29,6 +32,9 @@ export default function AgentPage() {
       });
 
       const data = await apiResponse.json();
+      const endTime = Date.now(); // Record end time
+      const totalDuration = (endTime - startTime) / 1000; // Duration in seconds
+      setDuration(totalDuration);
 
       // Artificial delays for agentic "feel"
       await new Promise(r => setTimeout(r, 600));
@@ -73,7 +79,20 @@ export default function AgentPage() {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') handleSubmit();
+    if (e.key === 'Enter') {
+      setStartTime(Date.now()); // Record start time when Enter is pressed
+      handleSubmit();
+    }
+  };
+
+  // Helper to format duration
+  const formatDuration = (seconds) => {
+    if (seconds < 60) {
+      return `${seconds.toFixed(1)}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(0);
+    return `${minutes}m ${remainingSeconds}s`;
   };
 
   return (
@@ -117,7 +136,7 @@ export default function AgentPage() {
                   </h3>
                   <div className="pl-5 space-y-0.5 opacity-80">
                     <p>Summary: {biz.summary}</p>
-                    <p>Positive Remarks: {biz.positive_remarks?.join(", ")}</p>
+                    <p>Positive Remarks: {(Array.isArray(biz.positive_remarks) ? biz.positive_remarks : []).join(", ")}</p>
                     {biz.actionable_complaints?.length > 0 && (
                       <div className="pt-1">
                         <p>Actionable Complaints:</p>
@@ -170,7 +189,7 @@ export default function AgentPage() {
                     </div>
                     <div className="bg-white/5 p-4 border-l-2 border-blue-500/50">
                       <p className="text-white/40 mb-1 text-xs uppercase">Strategic Hook</p>
-                      <p className="text-blue-300 italic">"{response.card.conversion_strategy_hook}"</p>
+                      <p className="text-blue-300 italic">&quot;{response.card.conversion_strategy_hook}&quot;</p>
                     </div>
                   </div>
                 </div>
@@ -195,7 +214,7 @@ export default function AgentPage() {
           {(logs.length > 0 || loading) && (
             <div className="pb-4 space-y-1" style={{ letterSpacing: "-0.045em", lineHeight: "1.3" }}>
               {logs.map((log, i) => (
-                <div key={i} className={`flex gap-2 ${i === 0 ? "text-blue-400" : "opacity-60 pl-4"}`}>
+                <div key={i} className={`flex gap-2 ${i === 0 ? "text-blue-400" : "opacity-100 pl-4"}`}>
                   {i > 0 && <span>└</span>}
                   <span>{log.text}</span>
                 </div>
@@ -209,7 +228,7 @@ export default function AgentPage() {
                       <path d="M12 2l-10 6v8l10 6 10-6v-8l-10-6zm0 2.5l7.5 4.5-7.5 4.5-7.5-4.5 7.5-4.5z"/>
                     </svg>
                   </div>
-                  <span className="text-white text-lg tracking-wide">Cooking ...</span>
+                  <span className="text-white text-lg tracking-tight">Cooking ... {duration > 0 && `(${formatDuration(duration)})`}</span>
                 </div>
               )}
             </div>
