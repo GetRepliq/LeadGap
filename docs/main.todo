@@ -54,7 +54,7 @@ Agent Migration & Backend System:
      ✔ Migrate core logic from @cli/core/ to new backend directory @done(26-04-05 11:11)
      ✔ Adapt Node.js agent for web-based JSON responses instead of TUI @done(26-04-05 11:11)
      ☐ Port Python scraping and memory scripts to serverless environment
-     ⏳ Setup headless Chromium/Selenium for serverless scraping @inprogress(26-04-07 13:44)
+     ✔ Setup headless Chromium/Selenium for serverless scraping @done(26-04-08 17:24)
      ☐ Configure Python dependency management for Vercel deployment
 
 Supabase Database Integration:
