@@ -60,10 +60,10 @@ export default function Main() {
 
         {/* Navbar */}
         <nav className="relative z-10 flex items-center justify-between px-8 py-6 w-full">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md bg-[#1a1a1a] border border-white/10 flex items-center justify-center">
+          <div className="flex items-center gap-1">
+            <div className="w-10 h-10 flex items-center justify-center">
               <span className="text-white text-sm font-semibold" style={{ letterSpacing: "-0.06em" }}>
-                LG
+                <img src="/White-Logo.svg" alt="LeadGap" className="inline-block h-8" />
               </span>
             </div>
             <span className="text-white text-2xl font-semibold" style={{ letterSpacing: "-0.06em" }}>
@@ -286,7 +286,7 @@ export default function Main() {
             
             {/* Left Side: Image + Text */}
             <div className="flex flex-col gap-2 max-w-sm">
-              <img src="/BlackLogo.png" alt="LeadGap" className="w-28 h-auto mb-2 cursor-pointer" />
+              <img src="/White-Logo.svg" alt="LeadGap" className="h-8 mb-2 cursor-pointer self-start" />
               <h3 className="text-base w-[520px] font-medium tracking-tight leading-6 text-white/85">
               LeadGap is an AI-powered market intelligence engine for local businesses and sales teams — enter a niche or competitor and get surgical vulnerability reports, market gap analysis, and precision ad copy, so you can outplay your rivals and close more deals without doing hours of manual research.
               </h3>
