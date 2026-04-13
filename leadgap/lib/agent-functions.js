@@ -1,6 +1,5 @@
-import {
-  GoogleGenerativeAI
-} from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from '@supabase/supabase-js';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,6 +7,12 @@ import fs from 'fs';
 
 // --- Gemini API Configuration ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// --- Supabase Configuration ---
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_PRIVATE_SERVICE_ROLE;
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // --- Regional Server Configuration ---
 const REGIONAL_BASE_URLS = {
@@ -79,6 +84,80 @@ export async function withRegionFallback(apiFn) {
   throw new Error(
     '[agent] All regions returned 503. Gemini is experiencing widespread issues. Please try again later.'
   );
+}
+
+/**
+ * Uses Gemini to synthesize raw analysis into a structured project-level cache.
+ * Replaces the functionality of memory.py
+ */
+async function synthesizeMarketIntelligence(rawAnalysis, query) {
+  const prompt = `You are an expert market intelligence analyst. Your task is to synthesize the following raw business analysis data into a structured market research cache.
+        
+        The user's original query was: "${query}"
+        
+        Raw Analysis Data:
+        ${JSON.stringify(rawAnalysis, null, 2)}
+        
+        Synthesize this into the following JSON template for maximum information retention and future reuse by an AI agent. Focus on "distilling" the intelligence. 
+        
+        Template:
+        {
+          "project": {
+            "niche": "Detailed niche name",
+            "location": "Geographic area if applicable",
+            "last_updated": "ISO timestamp",
+            "total_businesses_analyzed": "number"
+          },
+          "market_intelligence": {
+            "summary": "High-level synthesis",
+            "core_pain_points": [
+              {
+                "issue": "Specific pain point",
+                "intensity": "low|medium|high",
+                "evidence": "Briefly why this was identified",
+                "context": "Deeper context"
+              }
+            ],
+            "unmet_demands": ["List of gaps identified"]
+          },
+          "competitor_matrix": [
+            {
+              "name": "Competitor",
+              "weaknesses": ["points"],
+              "strengths": ["points"],
+              "sentiment_trends": "brief summary"
+            }
+          ],
+          "opportunity_gaps": [
+            {
+              "gap_id": "gap_N",
+              "description": "The gap",
+              "proposed_solution": "Actionable idea",
+              "estimated_value": "high|medium|low"
+            }
+          ],
+          "generated_assets": {
+            "value_propositions": ["Unique selling points based on gaps"],
+            "ad_copy_snippets": { "search_ads": [{ "headline": "...", "description": "..." }] }
+          }
+        }
+        
+        Return ONLY the raw JSON object.`;
+
+  try {
+    const llmText = await withRegionFallback(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "models/gemini-flash-latest",
+        generationConfig: { responseMimeType: "application/json" },
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
+    return JSON.parse(llmText);
+  } catch (error) {
+    console.error('[agent] Error during market synthesis:', error);
+    return null;
+  }
 }
 
 export async function analyzeReviews(reviews) {
@@ -158,7 +237,7 @@ Example JSON structure:
       analysisJson = JSON.parse(llmText);
     } catch (parseError) {
       console.error('AI Analysis: Could not parse LLM\'s JSON response. Raw LLM text:', llmText, parseError);
-      return { error: `Could not parse LLM's JSON response. Raw LLM text: ${llmText}` };
+      return { error: `Could not parse LLM\'s JSON response. Raw LLM text: ${llmText}` };
     }
 
     if (!analysisJson.businesses || analysisJson.businesses.length === 0) {
@@ -166,7 +245,6 @@ Example JSON structure:
         return { error: 'The LLM returned no business data.', rawJson: analysisJson };
     }
 
-    // Return the raw JSON for the web app to process and display
     return { rawJson: analysisJson };
 
   } catch (error) {
@@ -178,47 +256,36 @@ Example JSON structure:
 export async function updateMemory(rawAnalysis, searchQuery) {
   if (!rawAnalysis) return;
 
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  // Adjusted path to reach cli/core/memory.py from leadgap/lib/agent-functions.js
-  const pythonScriptPath = path.resolve(currentDir, '../../cli/core', 'memory.py');
-
-  if (!fs.existsSync(pythonScriptPath)) {
-    const errorMsg = `[memory] Error: Python script not found at ${pythonScriptPath}`;
-    console.error(errorMsg);
-    throw new Error(errorMsg);
+  console.log('[agent] Synthesizing market intelligence for cache...');
+  const synthesizedData = await synthesizeMarketIntelligence(rawAnalysis, searchQuery);
+  
+  if (!synthesizedData) {
+    return { error: "Failed to synthesize market intelligence for storage." };
   }
 
-  const payload = JSON.stringify({ analysis: rawAnalysis, query: searchQuery });
+  try {
+    const { data, error } = await supabase
+      .from('market_intelligence')
+      .insert([
+        {
+          query: searchQuery,
+          niche: synthesizedData.project?.niche || null,
+          data: synthesizedData
+        },
+      ])
+      .select();
 
-  return new Promise((resolve, reject) => {
-    const pythonProcess = spawn('python3', [pythonScriptPath]);
+    if (error) {
+      console.error('[supabase] Error inserting intelligence:', error);
+      return { error: `Failed to update memory in Supabase: ${error.message}` };
+    }
 
-    pythonProcess.stdin.write(payload);
-    pythonProcess.stdin.end();
-
-    let stdoutData = '';
-    let stderrData = '';
-
-    pythonProcess.stdout.on('data', (data) => {
-      stdoutData += data.toString();
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-      stderrData += data.toString();
-    });
-
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        console.log(`[memory] Cache updated successfully.`);
-        // console.log(`[memory] stdout: ${stdoutData.trim()}`); // Remove verbose console.log for web backend
-        resolve({ success: true, stdout: stdoutData.trim() });
-      } else {
-        const errorMsg = `[memory] Error updating cache (exit code ${code}).\nStderr: ${stderrData.trim()}\nStdout: ${stdoutData.trim()}`;
-        console.error(errorMsg);
-        reject(new Error(errorMsg));
-      }
-    });
-  });
+    console.log('[supabase] Intelligence cache updated successfully.');
+    return { success: true, data };
+  } catch (err) {
+    console.error('[agent] Error during memory update flow:', err);
+    return { error: `An unexpected error occurred updating memory: ${err.message}` };
+  }
 }
 
 export async function classifyIntent(command) {
@@ -310,8 +377,6 @@ Return exactly 3 vulnerabilities. Return ONLY the raw JSON object.
     });
 
     const card = JSON.parse(llmText);
-    
-    // Return the raw JSON card object. Formatting for display will be handled by the frontend.
     return { card, business_info };
 
   } catch (error) {
@@ -323,24 +388,26 @@ Return exactly 3 vulnerabilities. Return ONLY the raw JSON object.
 export async function generateMarketingContent(request) {
   if (!GEMINI_API_KEY) return { error: "Error: API key missing." };
 
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  // Adjusted path to reach cli/data/market_info.json from leadgap/lib/agent-functions.js
-  const cachePath = path.resolve(currentDir, '../../cli/data', 'market_info.json');
-  
-  if (!fs.existsSync(cachePath)) {
-    return { error: "No market research found. Please run a review extraction first (e.g., '@search plumbers in Austin') to build the intelligence cache." };
-  }
-
-  let cacheData;
   try {
-    const rawCache = fs.readFileSync(cachePath, 'utf8');
-    if (!rawCache || rawCache.trim() === "") throw new Error("Empty cache");
-    cacheData = JSON.parse(rawCache);
-  } catch (e) {
-    return { error: "The market intelligence cache is empty or corrupted. Please perform fresh research." };
-  }
+    // Fetch the most recent market intelligence data from Supabase
+    const { data, error } = await supabase
+      .from('market_intelligence')
+      .select('data')
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-  const prompt = `You are an expert direct-response copywriter. Use the following Market Intelligence Cache to fulfill the user's request.
+    if (error) {
+      console.error('[supabase] Error fetching intelligence:', error);
+      return { error: `Failed to fetch intelligence from database: ${error.message}` };
+    }
+
+    if (!data || data.length === 0 || !data[0].data) {
+      return { error: "No market research found in memory. Please run a review extraction first (e.g., 'Analyze cafes in London') to build the intelligence cache." };
+    }
+
+    const cacheData = data[0].data;
+
+    const prompt = `You are an expert direct-response copywriter. Use the following Market Intelligence Cache to fulfill the user's request.
 
 MARKET INTELLIGENCE CACHE:
 ${JSON.stringify(cacheData, null, 2)}
@@ -383,7 +450,6 @@ Your task:
 Format the output clearly for a terminal display. Use bold headers and bullet points.
 `;
 
-  try {
     const content = await withRegionFallback(async (genAI) => {
       const model = genAI.getGenerativeModel({
         model: "models/gemini-flash-latest",
@@ -400,7 +466,7 @@ Format the output clearly for a terminal display. Use bold headers and bullet po
 
 export async function scrapeReviews({
   searchQuery,
-  mode = "niche", // "niche" or "competitor"
+  mode = "niche", 
   competitorName = null,
   location = null,
   maxBusinesses = 3,
@@ -428,50 +494,30 @@ export async function scrapeReviews({
   ];
 
   if (mode === "competitor") {
-    if (!location) {
-      return { error: "[scraper] Location is required for competitor mode." };
-    }
-    // For competitor mode, searchQuery is the competitorName
+    if (!location) return { error: "[scraper] Location is required for competitor mode." };
     args[1] = competitorName; 
     args.push("--location", location);
   }
 
   return new Promise((resolve, reject) => {
-    // console.log(`[scraper] Spawning python process: python3 ${args.join(' ')}`);
     const pythonProcess = spawn('python3', args);
-
     let stdoutData = '';
     let stderrData = '';
 
-    pythonProcess.stdout.on('data', (data) => {
-      stdoutData += data.toString();
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-      stderrData += data.toString();
-    });
+    pythonProcess.stdout.on('data', (data) => { stdoutData += data.toString(); });
+    pythonProcess.stderr.on('data', (data) => { stderrData += data.toString(); });
 
     pythonProcess.on('close', (code) => {
       if (code === 0) {
-        try {
-          const parsedData = JSON.parse(stdoutData);
-          resolve(parsedData);
-        } catch (parseError) {
-          console.error('[scraper] Error parsing Python script JSON output:', parseError);
-          console.error('[scraper] Raw stdout:', stdoutData);
-          console.error('[scraper] Raw stderr:', stderrData);
-          reject(new Error(`[scraper] Failed to parse Python script output: ${parseError.message}`));
-        }
+        try { resolve(JSON.parse(stdoutData)); } 
+        catch (e) { reject(new Error(`[scraper] JSON parse error: ${e.message}`)); }
       } else {
-        const errorMsg = `[scraper] Python script exited with code ${code}.\nStderr: ${stderrData.trim()}\nStdout: ${stdoutData.trim()}`;
-        console.error(errorMsg);
-        reject(new Error(errorMsg));
+        reject(new Error(`[scraper] Exit code ${code}: ${stderrData}`));
       }
     });
 
     pythonProcess.on('error', (err) => {
-      console.error('[scraper] Failed to start Python subprocess:', err);
-      reject(new Error(`[scraper] Failed to start Python subprocess: ${err.message}`));
+      reject(new Error(`[scraper] Failed to start: ${err.message}`));
     });
   });
 }

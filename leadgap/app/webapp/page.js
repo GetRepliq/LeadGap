@@ -127,7 +127,7 @@ export default function AgentPage() {
           style={{ letterSpacing: "-0.035em", lineHeight: "1.3" }}
         >
           {response && (
-            <div className="space-y-6 mb-8 max-h-[60vh] overflow-y-auto pr-2 [-webkit-overflow-scrolling:touch] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+            <div className="space-y-6 mb-8 max-h-[60vh] overflow-y-auto pr-2 [-webkit-overflow-scrolling:touch] scrollbar-hide">
               {/* Market Analysis View */}
               {response.rawJson?.businesses?.map((biz, idx) => (
                 <div key={idx} className="space-y-1">

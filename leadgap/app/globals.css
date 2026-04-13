@@ -66,3 +66,14 @@ body {
   font-weight: 500;
   line-height: 145%;
 }
+
+/* Utility to hide scrollbar while keeping scroll functionality */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+}
