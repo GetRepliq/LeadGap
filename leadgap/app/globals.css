@@ -67,6 +67,31 @@ body {
   line-height: 145%;
 }
 
+/* ── Generated Content Styling ── */
+.generated-content {
+  @apply text-white/90 font-sans;
+  min-height: 16rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.marketing-content {
+  @apply text-lg md:text-xl font-medium text-white mb-6;
+  line-height: 1.45;
+}
+
+.strategist-note {
+  @apply text-sm md:text-base italic mt-4 pt-4 border-t border-white/5 text-blue-300/60 leading-relaxed;
+}
+
+.vintage {
+  background: rgba(255, 255, 255, 0.015);
+  border-left: 2px solid rgba(74, 158, 255, 0.4);
+}
+
 /* Utility to hide scrollbar while keeping scroll functionality */
 @layer utilities {
   .scrollbar-hide {

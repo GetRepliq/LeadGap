@@ -385,6 +385,77 @@ Return exactly 3 vulnerabilities. Return ONLY the raw JSON object.
   }
 }
 
+export function formatGeneratedContent(plainContent) {
+  // 1. Handle Markdown Bold: **text** -> <strong>text</strong>
+  let formatted = plainContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  // 2. Pre-process: Handle inline bullets like " * PROBLEM:" or " * :" by adding newlines
+  formatted = formatted.replace(/ (\*|-) /g, '\n$1 ');
+  
+  // 3. Split by double newlines to identify paragraphs/sections
+  const sections = formatted.split(/\n\n+/);
+  
+  const htmlContent = sections.map((section, idx) => {
+    let cleanSection = section.trim();
+    if (!cleanSection) return '';
+
+    // Detect if this section is a header
+    const isHeader = cleanSection.match(/^(#|\d+\.|Facebook|Google|Website|PAS|AIDA|BAB)/i);
+    
+    if (isHeader) {
+      return `<h3 class="text-white font-medium mt-6 mb-2 text-sm uppercase tracking-wider">${cleanSection}</h3>`;
+    }
+
+    // Special handling for HOOK
+    if (cleanSection.includes('[HOOK]')) {
+      return `
+        <div class="pl-5 space-y-1 opacity-90">
+          <p class="text-white/50 text-[10px] uppercase tracking-normal">Hook Strategy</p>
+          <div class="pl-4 mt-0.5">
+            <p class="text-white pl-4 flex gap-2 text-sm leading-tight">
+              <span>└</span>
+              <span class="italic">${cleanSection.replace('[HOOK]', '').trim()}</span>
+            </p>
+          </div>
+        </div>`;
+    }
+
+    // Special handling for STRATEGIST NOTE
+    if (cleanSection.includes('[STRATEGIST NOTE]')) {
+      return `
+        <div class="pl-5 space-y-1 opacity-90 mt-6">
+          <p class="text-white/40 text-[10px] uppercase tracking-tight">Strategic Rationale</p>
+          <div class="pl-4 mt-0.5">
+            <p class="text-white/70 pl-4 flex gap-2 text-xs leading-tight">
+              <span>└</span>
+              <span class="italic">${cleanSection.replace('[STRATEGIST NOTE]', '').trim()}</span>
+            </p>
+          </div>
+        </div>`;
+    }
+
+    // Handle list items
+    if (cleanSection.match(/^[\-\*]\s/m)) {
+      const lines = cleanSection.split('\n');
+      const listHtml = lines.map(line => {
+        const match = line.match(/^[\-\*]\s*(.*)/);
+        if (match) {
+          return `<div class="flex gap-2 ml-4 text-white opacity-100 text-sm mb-2"><span>└</span><span>${match[1]}</span></div>`;
+        }
+        return `<div class="mb-1 text-sm">${line}</div>`;
+      }).join('');
+      return `<div class="pl-5 space-y-0.5">${listHtml}</div>`;
+    }
+
+    // Default paragraph
+    return `<div class="pl-5 space-y-0.5">
+      <p class="text-white text-sm opacity-100 leading-relaxed">${cleanSection.replace(/\n/g, '<br/>')}</p>
+    </div>`;
+  }).join('');
+
+  return `<div class="space-y-6 font-agent-body">${htmlContent}</div>`;
+}
+
 export async function generateMarketingContent(request) {
   if (!GEMINI_API_KEY) return { error: "Error: API key missing." };
 

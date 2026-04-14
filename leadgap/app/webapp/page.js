@@ -4,23 +4,23 @@ import { useState, useEffect } from "react";
 
 export default function AgentPage() {
   const [input, setInput] = useState("");
-  const [response, setResponse] = useState(null);
+  const [responses, setResponses] = useState([]); // Changed to array to persist history
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
-  const [startTime, setStartTime] = useState(0); // New state for start time
-  const [duration, setDuration] = useState(0); // New state for duration
+  const [startTime, setStartTime] = useState(0); 
+  const [duration, setDuration] = useState(0); 
 
   const handleSubmit = async () => {
     if (!input.trim() || loading) return;
 
     setLoading(true);
-    setResponse(null);
+    // Removed setResponse(null) to keep previous responses
     setLogs([]);
-    // setStartTime(Date.now()); // Moved to handleKeyPress
+    const currentInput = input;
+    setInput(""); // Clear input after submission
 
-    // Initial logs
     setLogs([
-      { text: `Agent initiated for: "${input}"`, type: "info" },
+      { text: `Agent initiated for: "${currentInput}"`, type: "info" },
       { text: "Classifying intent...", type: "step" },
     ]);
 
@@ -28,15 +28,14 @@ export default function AgentPage() {
       const apiResponse = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: currentInput }),
       });
 
       const data = await apiResponse.json();
-      const endTime = Date.now(); // Record end time
-      const totalDuration = (endTime - startTime) / 1000; // Duration in seconds
+      const endTime = Date.now();
+      const totalDuration = (endTime - startTime) / 1000;
       setDuration(totalDuration);
 
-      // Artificial delays for agentic "feel"
       await new Promise(r => setTimeout(r, 600));
 
       if (data.intent === 'extract_reviews') {
@@ -68,19 +67,19 @@ export default function AgentPage() {
       await new Promise(r => setTimeout(r, 500));
       setLogs(prev => [...prev, { text: "Response ready.", type: "info" }]);
       
-      setResponse(data);
+      // Append the original query to the response for context in the history
+      setResponses(prev => [...prev, { ...data, query: currentInput }]);
     } catch (error) {
       setLogs(prev => [...prev, { text: "Critical Error: Process aborted.", type: "error" }]);
-      setResponse({ error: error.message });
+      setResponses(prev => [...prev, { error: error.message, query: currentInput }]);
     } finally {
-      // Small final delay so the user sees "Response ready" before the pulse stops
       setTimeout(() => setLoading(false), 800);
     }
   };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
-      setStartTime(Date.now()); // Record start time when Enter is pressed
+      setStartTime(Date.now());
       handleSubmit();
     }
   };
@@ -104,103 +103,121 @@ export default function AgentPage() {
         fontFamily: "var(--font-jetbrains-mono), 'Courier New', monospace",
       }}
     >
-      <div className={`flex-1 flex flex-col mx-auto w-full max-w-[900px] px-6 transition-all duration-700 ease-in-out ${!response && !loading ? 'justify-center' : 'pt-8'}`}>
+      <div className={`flex-1 flex flex-col mx-auto w-full max-w-[900px] px-6 transition-all duration-700 ease-in-out ${responses.length === 0 && !loading ? 'justify-center' : 'pt-8'}`}>
         
         {/* ── Header ── */}
-        <div className={`flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out ${!response && !loading ? 'mb-12' : 'mb-10 scale-75 origin-top'}`}>
-          <div className={`transition-all duration-700 ${!response && !loading ? 'mb-8' : 'mb-4'}`} style={{ color: "rgba(255, 255, 255, 0.45)" }}>
-            <svg width={!response && !loading ? "60" : "40"} height={!response && !loading ? "60" : "40"} viewBox="0 0 64 64" fill="none">
-              <rect x="27" y="4" width="10" height="56" rx="2" fill="currentColor"/>
-              <rect x="4" y="27" width="56" height="10" rx="3" fill="currentColor"/>
-            </svg>
+        <div className={`flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out ${responses.length === 0 && !loading ? 'mb-12' : 'mb-10 scale-75 origin-top'}`}>
+          <div className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'mb-8' : 'mb-4'}`}>
+            <img 
+              src="/White-Logo.svg" 
+              alt="LeadGap Logo" 
+              className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'w-[60px] h-[60px]' : 'w-[40px] h-[40px]'}`}
+            />
           </div>
-          <p className={`${!response && !loading ? 'text-2xl' : 'text-xl'} mb-1 opacity-60 transition-all duration-700`}>Hi Dean Winchester</p>
-          <h1 className={`${!response && !loading ? 'text-2xl' : 'text-xl'} text-white font-medium transition-all duration-700 ${!response && !loading ? 'mb-6' : 'mb-2'}`}>Can I help you with anything?</h1>
-          <p className={`max-w-[480px] leading-relaxed opacity-50 transition-all duration-700 ${!response && !loading ? 'text-sm' : 'text-xs'}`}>
+          <p className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} mb-1 opacity-60 transition-all duration-700`}>Hi Dean Winchester</p>
+          <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-medium transition-all duration-700 ${responses.length === 0 && !loading ? 'mb-6' : 'mb-2'}`}>Can I help you with anything?</h1>
+          <p className={`max-w-[480px] leading-relaxed opacity-50 transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
             I&apos;m ready to analyze market reviews, identify competitor weaknesses, and build your winning strategy.
           </p>
         </div>
 
         {/* ── Results Area ── */}
         <div
-          className={`flex flex-col transition-opacity duration-700 ${!response && !loading ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}
+          className={`flex flex-col transition-opacity duration-700 ${responses.length === 0 && !loading ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}
           style={{ letterSpacing: "-0.035em", lineHeight: "1.3" }}
         >
-          {response && (
-            <div className="space-y-6 mb-8 max-h-[60vh] overflow-y-auto pr-2 [-webkit-overflow-scrolling:touch] scrollbar-hide">
-              {/* Market Analysis View */}
-              {response.rawJson?.businesses?.map((biz, idx) => (
-                <div key={idx} className="space-y-1">
-                  <h3 className="text-white font-medium">
-                    {idx + 1}. Business: {biz.business_name}
-                  </h3>
-                  <div className="pl-5 space-y-0.5 opacity-80">
-                    <p>Summary: {biz.summary}</p>
-                    <p>Positive Remarks: {(Array.isArray(biz.positive_remarks) ? biz.positive_remarks : []).join(", ")}</p>
-                    {biz.actionable_complaints?.length > 0 && (
-                      <div className="pt-1">
-                        <p>Actionable Complaints:</p>
-                        {biz.actionable_complaints.map((c, i) => (
-                          <div key={i} className="pl-4 mt-0.5">
-                            <p>{i + 1}. {c.complaint} (Frustration: {c.frustration_intensity})</p>
-                            <p className="opacity-60 pl-4 flex gap-2">
-                              <span>└</span>
-                              <span className="italic">[{c.source_quote}]</span>
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <p className="pt-1">
-                      Buying Intent Detected: {biz.buying_intent?.detected ? `Yes - ${biz.buying_intent.explanation}` : "No"}
-                    </p>
+          {responses.length > 0 && (
+            <div className="space-y-12 mb-8 max-h-[60vh] overflow-y-auto pr-2 [-webkit-overflow-scrolling:touch] scrollbar-hide">
+              {responses.map((response, idx) => (
+                <div key={idx} className="space-y-6 border-b border-white/5 pb-10 last:border-0 last:pb-0">
+                  <div className="text-white/30 text-[10px] uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-1 h-1 bg-white/20 rounded-full"></span>
+                    Query: {response.query}
                   </div>
+                  
+                  {/* Market Analysis View */}
+                  {response.rawJson?.businesses?.map((biz, bIdx) => (
+                    <div key={bIdx} className="space-y-1">
+                      <h3 className="text-white font-medium">
+                        {bIdx + 1}. Business: {biz.business_name}
+                      </h3>
+                      <div className="pl-5 space-y-0.5 opacity-80">
+                        <p>Summary: {biz.summary}</p>
+                        <p>Positive Remarks: {(Array.isArray(biz.positive_remarks) ? biz.positive_remarks : []).join(", ")}</p>
+                        {biz.actionable_complaints?.length > 0 && (
+                          <div className="pt-1">
+                            <p>Actionable Complaints:</p>
+                            {biz.actionable_complaints.map((c, i) => (
+                              <div key={i} className="pl-4 mt-0.5">
+                                <p>{i + 1}. {c.complaint} (Frustration: {c.frustration_intensity})</p>
+                                <p className="opacity-60 pl-4 flex gap-2">
+                                  <span>└</span>
+                                  <span className="italic">[{c.source_quote}]</span>
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="pt-1">
+                          Buying Intent Detected: {biz.buying_intent?.detected ? `Yes - ${biz.buying_intent.explanation}` : "No"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Battle Card View */}
+                  {response.card && (
+                    <div className="space-y-4">
+                      <h3 className="text-white font-medium underline underline-offset-8 decoration-white/20 mb-6 uppercase tracking-wider text-xs">
+                        Competitor Analysis Report: {response.card.competitor_name}
+                      </h3>
+                      <div className="grid grid-cols-2 gap-8 opacity-80">
+                        <div>
+                          <p className="text-white/40 mb-1">Market Position</p>
+                          <p>{response.card.market_position}</p>
+                        </div>
+                        <div>
+                          <p className="text-white/40 mb-1">Frustration Level</p>
+                          <p>{response.card.customer_frustration_level}</p>
+                        </div>
+                      </div>
+                      <div className="pt-4 space-y-4 opacity-80">
+                        <div>
+                          <p className="text-white/40 mb-2">Key Vulnerabilities</p>
+                          {response.card.key_vulnerabilities?.map((v, i) => (
+                            <div key={i} className="pl-4 mb-2">
+                              <p>{i + 1}. {v.issue}</p>
+                              <p className="opacity-60 pl-4 flex gap-2">
+                                <span>└</span>
+                                <span className="italic">[{v.source_review}]</span>
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="bg-white/5 p-4 border-l-2 border-blue-500/50">
+                          <p className="text-white/40 mb-1 text-xs uppercase">Strategic Hook</p>
+                          <p className="text-blue-300 italic">&quot;{response.card.conversion_strategy_hook}&quot;</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Marketing Content View */}
+                  {response.content && (
+                    <div className="space-y-4">
+                      {response.formattedContent ? (
+                        <div 
+                          dangerouslySetInnerHTML={{ __html: response.formattedContent }} 
+                        />
+                      ) : (
+                        <div className="bg-white/5 p-6 rounded border border-white/10 opacity-90 leading-relaxed whitespace-pre-wrap">
+                          {response.content}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
-
-              {/* Battle Card View */}
-              {response.card && (
-                <div className="space-y-4">
-                  <h3 className="text-white font-medium underline underline-offset-8 decoration-white/20 mb-6 uppercase tracking-wider text-xs">
-                    Competitor Analysis Report: {response.card.competitor_name}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-8 opacity-80">
-                    <div>
-                      <p className="text-white/40 mb-1">Market Position</p>
-                      <p>{response.card.market_position}</p>
-                    </div>
-                    <div>
-                      <p className="text-white/40 mb-1">Frustration Level</p>
-                      <p>{response.card.customer_frustration_level}</p>
-                    </div>
-                  </div>
-                  <div className="pt-4 space-y-4 opacity-80">
-                    <div>
-                      <p className="text-white/40 mb-2">Key Vulnerabilities</p>
-                      {response.card.key_vulnerabilities?.map((v, i) => (
-                        <div key={i} className="pl-4 mb-2">
-                          <p>{i + 1}. {v.issue}</p>
-                          <p className="opacity-60 pl-4 flex gap-2">
-                            <span>└</span>
-                            <span className="italic">[{v.source_review}]</span>
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="bg-white/5 p-4 border-l-2 border-blue-500/50">
-                      <p className="text-white/40 mb-1 text-xs uppercase">Strategic Hook</p>
-                      <p className="text-blue-300 italic">&quot;{response.card.conversion_strategy_hook}&quot;</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Marketing Content View */}
-              {response.content && (
-                <div className="bg-white/5 p-6 rounded border border-white/10 opacity-90 leading-relaxed whitespace-pre-wrap">
-                  {response.content}
-                </div>
-              )}
             </div>
           )}
         </div>

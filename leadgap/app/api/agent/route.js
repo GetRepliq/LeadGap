@@ -1,4 +1,4 @@
-import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory, scrapeReviews } from '../../../lib/agent-functions';
+import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory, scrapeReviews, formatGeneratedContent } from '../../../lib/agent-functions';
 
 
 export async function POST(request) {
@@ -54,7 +54,16 @@ export async function POST(request) {
         if (!intentResult.contentRequest) {
           agentResponse = { error: "Please specify what content you'd like to generate." };
         } else {
-          agentResponse = await generateMarketingContent(intentResult.contentRequest);
+          const contentData = await generateMarketingContent(intentResult.contentRequest);
+          if (contentData.error) {
+            agentResponse = contentData;
+          } else {
+            agentResponse = {
+              content: contentData.content,
+              formattedContent: formatGeneratedContent(contentData.content),
+              intent: 'generate_content'
+            };
+          }
         }
         break;
       case 'other':
