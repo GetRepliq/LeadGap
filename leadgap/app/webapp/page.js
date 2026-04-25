@@ -96,14 +96,14 @@ export default function AgentPage() {
 
   return (
     <div
-      className="min-h-screen w-full flex flex-col text-sm"
+      className="h-screen w-full flex flex-col text-sm overflow-hidden"
       style={{
         background: "#0a0a0a",
         color: "rgba(255, 255, 255, 0.7)",
         fontFamily: "var(--font-jetbrains-mono), 'Courier New', monospace",
       }}
     >
-      <div className={`flex-1 flex flex-col mx-auto w-full max-w-[900px] px-6 transition-all duration-700 ease-in-out ${responses.length === 0 && !loading ? 'justify-center' : 'pt-8'}`}>
+      <div className="flex-1 flex flex-col mx-auto w-full max-w-[900px] px-6 pt-8 overflow-hidden">
         
         {/* ── Header ── */}
         <div className={`flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out ${responses.length === 0 && !loading ? 'mb-12' : 'mb-6 scale-90 origin-top'}`}>
@@ -116,18 +116,18 @@ export default function AgentPage() {
           </div>
           <p className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} mb-1 opacity-80 font-medium transition-all duration-700`}>Hi Dean Winchester</p>
           <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-semibold transition-all duration-700 ${responses.length === 0 && !loading ? 'mb-6' : 'mb-2'}`}>Can I help you with anything?</h1>
-          <p className={`max-w-[480px] leading-tight tracking-tight opacity-70 font-medium transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
+          <p className={`max-w-[480px] opacity-70 font-medium transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
             I&apos;m ready to analyze market reviews, identify competitor weaknesses, and build your winning strategy.
           </p>
         </div>
 
         {/* ── Results Area ── */}
         <div
-          className={`flex flex-col transition-opacity duration-700 ${responses.length === 0 && !loading ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}
+          className="flex-1 flex flex-col min-h-0"
           style={{ letterSpacing: "-0.035em", lineHeight: "1.3" }}
         >
-          {responses.length > 0 && (
-            <div className="space-y-12 mb-8 max-h-[60vh] overflow-y-auto pr-2 [-webkit-overflow-scrolling:touch] scrollbar-hide">
+          <div className="flex-1 overflow-y-auto pr-2 [-webkit-overflow-scrolling:touch] scrollbar-hide mb-8">
+            <div className="space-y-12">
               {responses.map((response, idx) => (
                 <div key={idx} className="space-y-6 border-b border-white/5 pb-10 last:border-0 last:pb-0">
                   <div className="text-white/30 text-[10px] uppercase tracking-widest flex items-center gap-2">
@@ -218,39 +218,38 @@ export default function AgentPage() {
                   )}
                 </div>
               ))}
+              
+              {/* ── Status Logs (Now inside scrollable area) ── */}
+              {(logs.length > 0 || loading) && (
+                <div className="pt-4 pb-8 space-y-1" style={{ letterSpacing: "-0.045em", lineHeight: "1.3" }}>
+                  {logs.map((log, i) => (
+                    <div key={i} className={`flex gap-2 ${i === 0 ? "text-blue-400" : "opacity-100 pl-4"}`}>
+                      {i > 0 && <span>└</span>}
+                      <span>{log.text}</span>
+                    </div>
+                  ))}
+                  
+                  {loading && (
+                    <div className="flex items-center gap-3 pt-4 animate-pulse">
+                      <div className="w-5 h-5 relative">
+                        <div className="absolute inset-0 bg-green-500/20 rounded-full blur-md"></div>
+                        <svg viewBox="0 0 24 24" className="w-full h-full text-green-500 fill-current">
+                          <path d="M12 2l-10 6v8l10 6 10-6v-8l-10-6zm0 2.5l7.5 4.5-7.5 4.5-7.5-4.5 7.5-4.5z"/>
+                        </svg>
+                      </div>
+                      <span className="text-white text-lg tracking-tight">Cooking ... {duration > 0 && `(${formatDuration(duration)})`}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
       {/* ── Input Bar (Pinned to Bottom) ── */}
-      <div className="w-full max-w-[900px] mx-auto px-6 pb-12">
+      <div className="w-full max-w-[900px] mx-auto px-6 pb-12 flex-shrink-0">
         <div className="mx-auto" style={{ maxWidth: "800px" }}>
-          
-          {/* ── Status Logs (Moved here to stay above input) ── */}
-          {(logs.length > 0 || loading) && (
-            <div className="pb-4 space-y-1" style={{ letterSpacing: "-0.045em", lineHeight: "1.3" }}>
-              {logs.map((log, i) => (
-                <div key={i} className={`flex gap-2 ${i === 0 ? "text-blue-400" : "opacity-100 pl-4"}`}>
-                  {i > 0 && <span>└</span>}
-                  <span>{log.text}</span>
-                </div>
-              ))}
-              
-              {loading && (
-                <div className="flex items-center gap-3 pt-4 animate-pulse">
-                  <div className="w-5 h-5 relative">
-                    <div className="absolute inset-0 bg-green-500/20 rounded-full blur-md"></div>
-                    <svg viewBox="0 0 24 24" className="w-full h-full text-green-500 fill-current">
-                      <path d="M12 2l-10 6v8l10 6 10-6v-8l-10-6zm0 2.5l7.5 4.5-7.5 4.5-7.5-4.5 7.5-4.5z"/>
-                    </svg>
-                  </div>
-                  <span className="text-white text-lg tracking-tight">Cooking ... {duration > 0 && `(${formatDuration(duration)})`}</span>
-                </div>
-              )}
-            </div>
-          )}
-
           <div
             className="flex items-center gap-3 w-full px-4 py-2"
             style={{
