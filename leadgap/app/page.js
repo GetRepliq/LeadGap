@@ -216,10 +216,10 @@ export default function Main() {
 
 
       {/* ─── FEATURES ─────────────────────────────────────────────────────── */}
-      <section id="features" className="bg-[#010409] px-6 md:px-8 py-10">
+      <section id="features" className="bg-[#010409] px-4 md:px-8 py-10">
         <div className="mx-auto max-w-[1250px]" style={{ border: "1px solid #1F1F1F" }}>
-          <div className="px-8 py-8" style={{ borderBottom: "1px solid #1F1F1F" }}>
-            <h2 className="text-white" style={{ fontSize: "39px", fontWeight: 600, letterSpacing: "-0.055em", lineHeight: "107%" }}>
+          <div className="px-6 py-6 md:px-8 md:py-8" style={{ borderBottom: "1px solid #1F1F1F" }}>
+            <h2 className="text-white text-2xl md:text-[39px]" style={{ fontWeight: 600, letterSpacing: "-0.055em", lineHeight: "107%" }}>
               Your Strategic Toolkit
             </h2>
           </div>
@@ -227,14 +227,14 @@ export default function Main() {
             {features.map((feature, index) => (
               <div
                 key={feature.title}
-                className={`px-8 py-10 flex flex-col gap-4 ${
+                className={`px-6 py-8 md:px-8 md:py-10 flex flex-col gap-4 ${
                   index !== features.length - 1 ? "border-b md:border-b-0 md:border-r border-[#1F1F1F]" : ""
                 }`}
               >
-                <h3 className="text-white" style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.055em", lineHeight: "107%" }}>
+                <h3 className="text-white text-xl md:text-[28px]" style={{ fontWeight: 600, letterSpacing: "-0.055em", lineHeight: "107%" }}>
                   {feature.title}
                 </h3>
-                <p className="text-white/40" style={{ fontSize: "17px", fontWeight: 400, letterSpacing: "-0.025em", lineHeight: "137%" }}>
+                <p className="text-white/40 text-sm md:text-[17px]" style={{ fontWeight: 400, letterSpacing: "-0.025em", lineHeight: "137%" }}>
                   {feature.description}
                 </p>
               </div>
