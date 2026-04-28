@@ -57,7 +57,7 @@ export default function Main() {
 
       <img
         src="/hero.png"
-        className="absolute top-0 left-0 pointer-events-none select-none w-full h-full object-cover md:h-screen"
+        className="absolute top-0 left-0 pointer-events-none select-none w-screen h-screen object-cover"
         style={{ display: "block" }}
         aria-hidden="true"
       />
