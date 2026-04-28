@@ -218,10 +218,10 @@ export default function Main() {
           </div>
 
           {/* Two column layout — equal halves, boxes centered to video */}
-          <div className="grid grid-cols-[5fr_3fr] gap-8 items-center">
+          <div className="grid grid-cols-[5fr_3fr] gap-18 items-center">
 
             {/* Left — video player, constrained height */}
-            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black" style={{ width: "600px", height: "750px", maxHeight: "750px" }}>
+            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black" style={{ width: "750px", height: "700px", maxHeight: "750px" }}>
               <video className="w-full h-full object-cover" autoPlay muted loop playsInline>
                 <source src="/process-demo.mp4" type="video/mp4" />
               </video>
