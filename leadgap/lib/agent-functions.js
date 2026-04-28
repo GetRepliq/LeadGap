@@ -540,8 +540,8 @@ export async function scrapeReviews({
   mode = "niche", 
   competitorName = null,
   location = null,
-  maxBusinesses = 3,
-  reviewsPerBusiness = 10,
+  maxBusinesses = 5,
+  reviewsPerBusiness = 15,
   minStars = 1,
   maxStars = 5,
 }) {

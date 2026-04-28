@@ -33,8 +33,26 @@ export default function AgentPage() {
 
       const data = await apiResponse.json();
       const endTime = Date.now();
-      const totalDuration = (endTime - startTime) / 1000;
-      setDuration(totalDuration);
+      
+      let calculatedDuration = 0; // Default to 0 for safety
+
+      // Ensure startTime is a valid number, greater than 0 (epoch start is 0),
+      // and endTime is later than startTime.
+      if (startTime !== null && typeof startTime === 'number' && startTime > 0 && endTime > startTime) {
+          const elapsed = endTime - startTime;
+          const totalDurationSeconds = elapsed / 1000;
+          
+          // Ensure the calculated duration is a finite, non-negative number
+          if (isFinite(totalDurationSeconds) && totalDurationSeconds >= 0) {
+              calculatedDuration = totalDurationSeconds;
+          }
+      } else {
+          // Log a warning if timing is invalid for debugging purposes
+          console.warn("Invalid start/end time for duration calculation. Resetting duration. startTime:", startTime, "endTime:", endTime);
+          calculatedDuration = 0; // Reset to 0 if invalid
+      }
+      
+      setDuration(calculatedDuration);
 
       await new Promise(r => setTimeout(r, 600));
 
