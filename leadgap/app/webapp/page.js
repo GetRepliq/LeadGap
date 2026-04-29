@@ -127,14 +127,14 @@ export default function AgentPage() {
         <div className={`flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out ${responses.length === 0 && !loading ? 'mb-12' : 'mb-6 scale-90 origin-top'}`}>
           <div className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'mb-8' : 'mb-4'}`}>
             <img 
-              src="/White-Logo.svg" 
+              src="/glass-logo.png" 
               alt="LeadGap Logo" 
-              className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'w-[60px] h-[60px]' : 'w-[40px] h-[40px]'}`}
+              className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'w-[100px] h-[100px]' : 'w-[65px] h-[65px]'}`}
             />
           </div>
-          <p className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} mb-1 opacity-80 font-medium transition-all duration-700`}>Hi Dean Winchester</p>
-          <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-semibold transition-all duration-700 ${responses.length === 0 && !loading ? 'mb-6' : 'mb-2'}`}>Can I help you with anything?</h1>
-          <p className={`max-w-[480px] opacity-70 font-medium transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
+          <p className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} mb-1 opacity-80 font-medium tracking-tighter transition-all duration-700`}>Hi Dean Winchester</p>
+          <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-semibold transition-all tracking-tighter duration-700 ${responses.length === 0 && !loading ? 'mb-2' : 'mb-2'}`}>Can I help you with anything?</h1>
+          <p className={`max-w-[480px] opacity-70 font-medium tracking-tight transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
             I&apos;m ready to analyze market reviews, identify competitor weaknesses, and build your winning strategy.
           </p>
         </div>
