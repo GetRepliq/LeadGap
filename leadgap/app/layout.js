@@ -19,6 +19,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata = {
   title: "Leadgap",
   description: "LeadGap uses AI to uncover market gaps and competitor weaknesses, providing intelligence to outmaneuver rivals and close more deals.",
+  icons: {
+    icon: "/White-Logo.png",
+  },
 };
 
 export default function RootLayout({ children }) {
