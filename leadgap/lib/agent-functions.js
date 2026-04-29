@@ -535,6 +535,49 @@ Format the output clearly for a terminal display. Use bold headers and bullet po
   }
 }
 
+/**
+ * Persists or updates a chat session in Supabase.
+ */
+export async function saveChat({ userId, chatId, title, messages }) {
+  if (!userId) return null;
+
+  try {
+    if (chatId) {
+      // Update existing chat
+      const { data, error } = await supabase
+        .from('chats')
+        .update({ 
+          messages, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', chatId)
+        .eq('user_id', userId) // Security check
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } else {
+      // Create new chat
+      const { data, error } = await supabase
+        .from('chats')
+        .insert([{
+          user_id: userId,
+          title: title || "New Research Session",
+          messages: messages
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+  } catch (error) {
+    console.error('[supabase] Error saving chat:', error);
+    return null;
+  }
+}
+
 export async function scrapeReviews({
   searchQuery,
   mode = "niche", 
