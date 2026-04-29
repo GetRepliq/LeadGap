@@ -66,7 +66,7 @@ Supabase Database Integration:
 User Accounts & Authentication:
      ✔ Enable Supabase Email Auth provider @done(26-04-29 11:30)
      ✔ Create public.profiles table and auto-creation trigger @done(26-04-29 11:30)
-     ☐ Implement Sign Up and Log In UI components
+     ✔ Implement Sign Up and Log In UI components @done(26-04-29 11:45)
      ☐ Set up Next.js Auth Middleware for protected routes
      ☐ Link market_intelligence entries to specific user_ids
      ☐ Create public.chats table for saving agent conversation history
