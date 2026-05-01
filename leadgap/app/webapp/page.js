@@ -1,23 +1,43 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 export default function AgentPage() {
   const [input, setInput] = useState("");
-  const [responses, setResponses] = useState([]); // Changed to array to persist history
+  const [responses, setResponses] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [startTime, setStartTime] = useState(0); 
   const [duration, setDuration] = useState(0); 
 
+  // --- Auth & Session State ---
+  const [user, setUser] = useState(null);
+  const [chatId, setChatId] = useState(null);
+  const router = useRouter();
+
+  // 1. Check for session on mount
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser(session.user);
+      } else {
+        // Option: router.push('/login'); 
+      }
+    };
+    getSession();
+  }, []);
+
   const handleSubmit = async () => {
     if (!input.trim() || loading) return;
 
-    setLoading(true);
-    // Removed setResponse(null) to keep previous responses
-    setLogs([]);
     const currentInput = input;
-    setInput(""); // Clear input after submission
+    setInput(""); 
+    setLoading(true);
+    setLogs([]);
+    setStartTime(Date.now());
 
     setLogs([
       { text: `Agent initiated for: "${currentInput}"`, type: "info" },
@@ -25,37 +45,36 @@ export default function AgentPage() {
     ]);
 
     try {
+      // 2. Prepare payload with history and userId
+      const historyPayload = responses.map(r => ([
+        { role: 'user', content: r.query },
+        { role: 'agent', content: r }
+      ])).flat();
+
       const apiResponse = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: currentInput }),
+        body: JSON.stringify({ 
+          message: currentInput,
+          userId: user?.id, 
+          chatId: chatId,   
+          history: historyPayload
+        }),
       });
 
       const data = await apiResponse.json();
       const endTime = Date.now();
-      
-      let calculatedDuration = 0; // Default to 0 for safety
 
-      // Ensure startTime is a valid number, greater than 0 (epoch start is 0),
-      // and endTime is later than startTime.
-      if (startTime !== null && typeof startTime === 'number' && startTime > 0 && endTime > startTime) {
-          const elapsed = endTime - startTime;
-          const totalDurationSeconds = elapsed / 1000;
-          
-          // Ensure the calculated duration is a finite, non-negative number
-          if (isFinite(totalDurationSeconds) && totalDurationSeconds >= 0) {
-              calculatedDuration = totalDurationSeconds;
-          }
-      } else {
-          // Log a warning if timing is invalid for debugging purposes
-          console.warn("Invalid start/end time for duration calculation. Resetting duration. startTime:", startTime, "endTime:", endTime);
-          calculatedDuration = 0; // Reset to 0 if invalid
-      }
-      
-      setDuration(calculatedDuration);
+      // 3. Persist the chatId for this session
+      if (data.chatId) setChatId(data.chatId);
+
+      let calculatedDuration = (endTime - Date.now()) / 1000;
+      if (startTime > 0) calculatedDuration = (endTime - startTime) / 1000;
+      setDuration(Math.abs(calculatedDuration));
 
       await new Promise(r => setTimeout(r, 600));
 
+      // Agentic Logging logic
       if (data.intent === 'extract_reviews') {
         setLogs(prev => [...prev, { text: "Intent detected: Market Research", type: "step" }]);
         await new Promise(r => setTimeout(r, 800));
@@ -85,7 +104,6 @@ export default function AgentPage() {
       await new Promise(r => setTimeout(r, 500));
       setLogs(prev => [...prev, { text: "Response ready.", type: "info" }]);
       
-      // Append the original query to the response for context in the history
       setResponses(prev => [...prev, { ...data, query: currentInput }]);
     } catch (error) {
       setLogs(prev => [...prev, { text: "Critical Error: Process aborted.", type: "error" }]);
@@ -96,17 +114,11 @@ export default function AgentPage() {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      setStartTime(Date.now());
-      handleSubmit();
-    }
+    if (e.key === 'Enter') handleSubmit();
   };
 
-  // Helper to format duration
   const formatDuration = (seconds) => {
-    if (seconds < 60) {
-      return `${seconds.toFixed(1)}s`;
-    }
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = (seconds % 60).toFixed(0);
     return `${minutes}m ${remainingSeconds}s`;
@@ -132,8 +144,8 @@ export default function AgentPage() {
               className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'w-[100px] h-[100px]' : 'w-[65px] h-[65px]'}`}
             />
           </div>
-          <p className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} mb-1 opacity-80 font-medium tracking-tighter transition-all duration-700`}>Hi Dean Winchester</p>
-          <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-semibold transition-all tracking-tighter duration-700 ${responses.length === 0 && !loading ? 'mb-2' : 'mb-2'}`}>Can I help you with anything?</h1>
+          <p className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} mb-1 opacity-80 font-medium tracking-tighter transition-all duration-700`}>Hi {user ? (user.user_metadata?.full_name || user.email) : "Dean Winchester"}</p>
+          <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-semibold transition-all tracking-tighter duration-700`}>Can I help you with anything?</h1>
           <p className={`max-w-[480px] opacity-70 font-medium tracking-tight transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
             I&apos;m ready to analyze market reviews, identify competitor weaknesses, and build your winning strategy.
           </p>
@@ -144,7 +156,7 @@ export default function AgentPage() {
           className="flex-1 flex flex-col min-h-0"
           style={{ letterSpacing: "-0.035em", lineHeight: "1.3" }}
         >
-          <div className="flex-1 overflow-y-auto pr-2 [-webkit-overflow-scrolling:touch] scrollbar-hide mb-8">
+          <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide mb-8">
             <div className="space-y-12">
               {responses.map((response, idx) => (
                 <div key={idx} className="space-y-6 border-b border-white/5 pb-10 last:border-0 last:pb-0">
@@ -156,9 +168,7 @@ export default function AgentPage() {
                   {/* Market Analysis View */}
                   {response.rawJson?.businesses?.map((biz, bIdx) => (
                     <div key={bIdx} className="space-y-1">
-                      <h3 className="text-white font-medium">
-                        {bIdx + 1}. Business: {biz.business_name}
-                      </h3>
+                      <h3 className="text-white font-medium">{bIdx + 1}. Business: {biz.business_name}</h3>
                       <div className="pl-5 space-y-0.5 opacity-80">
                         <p>Summary: {biz.summary}</p>
                         <p>Positive Remarks: {(Array.isArray(biz.positive_remarks) ? biz.positive_remarks : []).join(", ")}</p>
@@ -168,17 +178,12 @@ export default function AgentPage() {
                             {biz.actionable_complaints.map((c, i) => (
                               <div key={i} className="pl-4 mt-0.5">
                                 <p>{i + 1}. {c.complaint} (Frustration: {c.frustration_intensity})</p>
-                                <p className="opacity-60 pl-4 flex gap-2">
-                                  <span>└</span>
-                                  <span className="italic">[{c.source_quote}]</span>
-                                </p>
+                                <p className="opacity-60 pl-4 flex gap-2"><span>└</span><span className="italic">[{c.source_quote}]</span></p>
                               </div>
                             ))}
                           </div>
                         )}
-                        <p className="pt-1">
-                          Buying Intent Detected: {biz.buying_intent?.detected ? `Yes - ${biz.buying_intent.explanation}` : "No"}
-                        </p>
+                        <p className="pt-1">Buying Intent Detected: {biz.buying_intent?.detected ? `Yes - ${biz.buying_intent.explanation}` : "No"}</p>
                       </div>
                     </div>
                   ))}
@@ -190,14 +195,8 @@ export default function AgentPage() {
                         Competitor Analysis Report: {response.card.competitor_name}
                       </h3>
                       <div className="grid grid-cols-2 gap-8 opacity-80">
-                        <div>
-                          <p className="text-white/40 mb-1">Market Position</p>
-                          <p>{response.card.market_position}</p>
-                        </div>
-                        <div>
-                          <p className="text-white/40 mb-1">Frustration Level</p>
-                          <p>{response.card.customer_frustration_level}</p>
-                        </div>
+                        <div><p className="text-white/40 mb-1">Market Position</p><p>{response.card.market_position}</p></div>
+                        <div><p className="text-white/40 mb-1">Frustration Level</p><p>{response.card.customer_frustration_level}</p></div>
                       </div>
                       <div className="pt-4 space-y-4 opacity-80">
                         <div>
@@ -205,10 +204,7 @@ export default function AgentPage() {
                           {response.card.key_vulnerabilities?.map((v, i) => (
                             <div key={i} className="pl-4 mb-2">
                               <p>{i + 1}. {v.issue}</p>
-                              <p className="opacity-60 pl-4 flex gap-2">
-                                <span>└</span>
-                                <span className="italic">[{v.source_review}]</span>
-                              </p>
+                              <p className="opacity-60 pl-4 flex gap-2"><span>└</span><span className="italic">[{v.source_review}]</span></p>
                             </div>
                           ))}
                         </div>
@@ -223,21 +219,15 @@ export default function AgentPage() {
                   {/* Marketing Content View */}
                   {response.content && (
                     <div className="space-y-4">
-                      {response.formattedContent ? (
-                        <div 
-                          dangerouslySetInnerHTML={{ __html: response.formattedContent }} 
-                        />
-                      ) : (
-                        <div className="bg-white/5 p-6 rounded border border-white/10 opacity-90 leading-relaxed whitespace-pre-wrap">
-                          {response.content}
-                        </div>
-                      )}
+                      <div className="bg-white/5 p-6 rounded border border-white/10 opacity-90 leading-relaxed whitespace-pre-wrap">
+                        {response.content}
+                      </div>
                     </div>
                   )}
                 </div>
               ))}
               
-              {/* ── Status Logs (Now inside scrollable area) ── */}
+              {/* ── Status Logs ── */}
               {(logs.length > 0 || loading) && (
                 <div className="pt-4 pb-8 space-y-1" style={{ letterSpacing: "-0.045em", lineHeight: "1.3" }}>
                   {logs.map((log, i) => (
@@ -246,7 +236,6 @@ export default function AgentPage() {
                       <span>{log.text}</span>
                     </div>
                   ))}
-                  
                   {loading && (
                     <div className="flex items-center gap-3 pt-4 animate-pulse">
                       <div className="w-5 h-5 relative">
@@ -265,46 +254,22 @@ export default function AgentPage() {
         </div>
       </div>
 
-      {/* ── Input Bar (Pinned to Bottom) ── */}
+      {/* ── Input Bar ── */}
       <div className="w-full max-w-[900px] mx-auto px-6 pb-12 flex-shrink-0">
         <div className="mx-auto" style={{ maxWidth: "800px" }}>
-          <div
-            className="flex items-center gap-3 w-full px-4 py-2"
-            style={{
-              background: "transparent",
-              border: "1px solid rgba(255, 255, 255, 0.55)",
-            }}
-          >
-            <span
-              className="opacity-60"
-              style={{ color: "rgba(255, 255, 255, 0.55)", fontSize: "14px", flexShrink: 0 }}
-            >
-              →
-            </span>
-
+          <div className="flex items-center gap-3 w-full px-4 py-2 bg-transparent border border-white/20">
+            <span className="opacity-60 text-sm">→</span>
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={loading ? "Thinking..." : "Analyze Cafes in London ..."}
-              className="flex-1 bg-transparent outline-none"
-              style={{
-                fontSize: "14px",
-                color: "rgba(255, 255, 255, 0.55)",
-                caretColor: "#4a9eff",
-              }}
+              className="flex-1 bg-transparent outline-none text-white/80"
               disabled={loading}
             />
           </div>
-
-          <p
-            className="mt-3 opacity-30"
-            style={{ 
-              fontSize: "13px", 
-              textAlign: "left" 
-            }}
-          >
+          <p className="mt-3 opacity-30 text-[13px]">
             &gt; Engine: Gemini-3-flash | Context Memory: 15% used | Status: {loading ? "Processing..." : "Optimized"}
           </p>
         </div>

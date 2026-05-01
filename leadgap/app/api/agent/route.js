@@ -1,8 +1,8 @@
-import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory, scrapeReviews, formatGeneratedContent } from '../../../lib/agent-functions';
+import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory, scrapeReviews, formatGeneratedContent, saveChat } from '../../../lib/agent-functions';
 
 
 export async function POST(request) {
-  const { message } = await request.json();
+  const { message, userId, chatId, history = [] } = await request.json();
   console.log('Received message:', message);
 
   try {
@@ -26,7 +26,6 @@ export async function POST(request) {
         } else {
           console.log(`Scraped ${scrapedNicheReviews.length} reviews. Analyzing...`);
           agentResponse = await analyzeReviews(scrapedNicheReviews);
-          // Also update memory with the raw analysis (if successful)
           if (agentResponse && agentResponse.rawJson) {
             await updateMemory(agentResponse.rawJson, intentResult.searchQuery || message);
           }
@@ -35,7 +34,7 @@ export async function POST(request) {
       case 'competitor_analysis':
         console.log('Intent: competitor_analysis - Initiating scraping for competitor...');
         const scrapedCompetitorData = await scrapeReviews({
-          searchQuery: `${intentResult.competitorName} in ${intentResult.location}`, // Python script expects this format for the query argument
+          searchQuery: `${intentResult.competitorName} in ${intentResult.location}`, 
           mode: "competitor",
           competitorName: intentResult.competitorName,
           location: intentResult.location,
@@ -68,11 +67,33 @@ export async function POST(request) {
         break;
       case 'other':
       default:
-        agentResponse = { ...intentResult, message: "Hello! How can I help you today?" }; // Provide a default friendly message
+        agentResponse = { ...intentResult, message: "Hello! How can I help you today?" };
         break;
     }
 
-    return new Response(JSON.stringify(agentResponse), {
+    // --- Persist to Supabase if userId is provided ---
+    let savedChat = null;
+    if (userId) {
+      const updatedHistory = [
+        ...history,
+        { role: 'user', content: message },
+        { role: 'agent', content: agentResponse }
+      ];
+
+      const title = history.length === 0 ? message.substring(0, 40) : null;
+
+      savedChat = await saveChat({
+        userId,
+        chatId,
+        title,
+        messages: updatedHistory
+      });
+    }
+
+    return new Response(JSON.stringify({
+      ...agentResponse,
+      chatId: savedChat?.id || chatId
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
