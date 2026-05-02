@@ -204,31 +204,33 @@ export async function saveChat({ userId, chatId, title, messages }) {
   return error ? null : data;
 }
 
-/**
- * Calls the Render microservice to scrape reviews.
- */
 export async function scrapeReviews({ searchQuery, mode = "niche", competitorName, location }) {
+  const payload = {
+    query: searchQuery || competitorName, // Ensure we have a query
+    mode,
+    location,
+    max_businesses: 3,
+    reviews_per_business: 10
+  };
+
+  console.log("[agent] Sending payload to Render:", JSON.stringify(payload));
+
   try {
     const response = await fetch(SCRAPER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: searchQuery,
-        mode,
-        location,
-        max_businesses: 3,
-        reviews_per_business: 10
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.detail || "Scraper request failed");
+      const errBody = await response.text(); // Get raw text if JSON parse fails
+      console.error("[agent] Render returned error status:", response.status, "Body:", errBody);
+      throw new Error(`Scraper failed (${response.status}): ${errBody}`);
     }
 
     return await response.json();
   } catch (e) {
-    console.error("[agent] Scraper error:", e.message);
+    console.error("[agent] Fetch error during scraping:", e.message);
     return { error: e.message };
   }
 }
