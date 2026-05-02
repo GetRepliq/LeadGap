@@ -237,7 +237,7 @@ export default function AgentPage() {
                 onClick={() => loadChat(chat)}
                 className={`w-full text-left px-3 py-2 transition-all group relative ${chatId === chat.id ? "text-blue-400 bg-white/5" : "hover:text-white hover:bg-white/[0.02] opacity-40 hover:opacity-100"}`}
               >
-                <div className="truncate pr-4">
+                <div className="truncate pr-4 text-[12px]">
                   {chat.title}
                 </div>
                 {chatId === chat.id && (

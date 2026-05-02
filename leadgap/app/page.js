@@ -97,8 +97,9 @@ export default function Main() {
             >
               Get Started
             </button>
-            <button
-              className="px-5 py-2 rounded-full text-white text-sm font-medium transition-all duration-200 cursor-pointer"
+            <Link
+              href="/login"
+              className="px-5 py-2 rounded-full text-white text-sm font-medium transition-all duration-200 cursor-pointer flex items-center justify-center"
               style={{
                 letterSpacing: "-0.035em",
                 background: "rgba(247, 247, 247, 0.09)",
@@ -109,7 +110,7 @@ export default function Main() {
               }}
             >
               Find a Gap
-            </button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -139,12 +140,13 @@ export default function Main() {
             ))}
             <div className="flex flex-col gap-4 w-full px-10">
               <button className="px-5 py-3 rounded-full bg-white text-[#010409] text-lg font-medium">Get Started</button>
-              <button 
-                className="px-5 py-3 rounded-full text-white text-lg font-medium border border-white/12"
+              <Link 
+                href="/login"
+                className="px-5 py-3 rounded-full text-white text-lg font-medium border border-white/12 flex items-center justify-center"
                 style={{ background: "rgba(247, 247, 247, 0.09)" }}
               >
                 Find a Gap
-              </button>
+              </Link>
             </div>
           </div>
         )}
