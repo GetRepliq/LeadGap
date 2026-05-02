@@ -130,7 +130,25 @@ export async function updateMemory(rawAnalysis, searchQuery, apiKey) {
 export async function classifyIntent(command, apiKey) {
   if (!apiKey) return { intent: "error", detail: "API Key missing." };
 
-  const prompt = `Determine intent (extract_reviews, competitor_analysis, generate_content, other). Query: "${command}"`;
+  const prompt = `You are an intent classification AI. Determine the user's goal from the following command: "${command}"
+
+  Possible intents:
+  1. "extract_reviews": User wants to find general reviews for a NICHE or CATEGORY in an area. (e.g., "plumbers in Austin", "best cafes in London").
+  2. "competitor_analysis": User wants a deep dive into ONE SPECIFIC BRAND or BUSINESS NAME. (e.g., "Analyze ABC Plumbing", "Reviews for Starbucks in Soho").
+  3. "generate_content": User wants to create marketing materials based on research.
+  4. "other": General conversation.
+
+  CRITICAL RULE: If the user does not name a specific business, use "extract_reviews". 
+
+  Respond with ONLY a raw JSON object:
+  {
+    "intent": "extract_reviews" | "competitor_analysis" | "generate_content" | "other",
+    "searchQuery": "niche/topic for extract_reviews (else null)",
+    "competitorName": "exact name of business for competitor_analysis (else null)",
+    "location": "city/area (else null)",
+    "contentRequest": "description for generate_content (else null)"
+  }
+  `;
 
   try {
     const llmText = await withRegionFallback(async (genAI) => {
@@ -141,7 +159,13 @@ export async function classifyIntent(command, apiKey) {
       const result = await model.generateContent(prompt);
       return result.response.text();
     }, apiKey);
-    return JSON.parse(llmText);
+    
+    const parsed = JSON.parse(llmText);
+    // Sanity check: ensure searchQuery is populated for extract_reviews
+    if (parsed.intent === 'extract_reviews' && !parsed.searchQuery) {
+        parsed.searchQuery = command;
+    }
+    return parsed;
   } catch (error) {
     return { intent: "error", detail: error.message };
   }

@@ -59,8 +59,10 @@ export async function POST(request) {
     // 3. Process Intent (Passing the activeApiKey to all functions)
     switch (intentResult.intent) {
       case 'extract_reviews':
+        console.log('Intent: extract_reviews - Initiating scraping...');
+        const query = intentResult.searchQuery || message;
         const scrapedNicheReviews = await scrapeReviews({
-          searchQuery: intentResult.searchQuery,
+          searchQuery: query,
           mode: "niche",
         });
 
@@ -69,16 +71,27 @@ export async function POST(request) {
         } else {
           agentResponse = await analyzeReviews(scrapedNicheReviews, activeApiKey);
           if (agentResponse && agentResponse.rawJson) {
-            await updateMemory(agentResponse.rawJson, intentResult.searchQuery || message);
+            await updateMemory(agentResponse.rawJson, query, activeApiKey);
           }
         }
         break;
+
       case 'competitor_analysis':
+        // Safety check: If AI classified as competitor but didn't provide a name, downgrade to niche search
+        if (!intentResult.competitorName) {
+          console.warn('Competitor analysis requested but name missing. Downgrading to extract_reviews.');
+          const fallbackQuery = intentResult.searchQuery || message;
+          const fallbackReviews = await scrapeReviews({ searchQuery: fallbackQuery, mode: "niche" });
+          agentResponse = fallbackReviews.error ? { error: fallbackReviews.error } : await analyzeReviews(fallbackReviews, activeApiKey);
+          break;
+        }
+
+        console.log(`Intent: competitor_analysis for ${intentResult.competitorName}`);
         const scrapedCompetitorData = await scrapeReviews({
-          searchQuery: `${intentResult.competitorName} in ${intentResult.location}`, 
+          searchQuery: intentResult.competitorName, 
           mode: "competitor",
           competitorName: intentResult.competitorName,
-          location: intentResult.location,
+          location: intentResult.location || "unknown location",
         });
 
         if (scrapedCompetitorData.error) {
@@ -87,6 +100,7 @@ export async function POST(request) {
           agentResponse = await analyzeCompetitor(scrapedCompetitorData, activeApiKey);
         }
         break;
+
       case 'generate_content':
         if (!intentResult.contentRequest) {
           agentResponse = { error: "Please specify what content you'd like to generate." };
