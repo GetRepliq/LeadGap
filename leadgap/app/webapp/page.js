@@ -230,7 +230,7 @@ export default function AgentPage() {
         
         <div className="flex-1 overflow-y-auto scrollbar-hide px-3 pb-6">
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-[0.2em] opacity-20 px-3 mb-4 mt-2">Previous Nodes</p>
+            <p className="text-[10px] uppercase tracking-[0.05em] opacity-60 px-3 mb-4 mt-2">Previous Nodes</p>
             {previousChats.map((chat) => (
               <button
                 key={chat.id}
@@ -270,7 +270,7 @@ export default function AgentPage() {
               />
             </div>
             <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-semibold transition-all tracking-tighter duration-700`}>
-              Terminal v4.0.2
+              Terminal v2.0.1
             </h1>
             <p className={`max-w-[480px] opacity-70 font-medium tracking-tight transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
               Autonomous intelligence agent ready for command.
