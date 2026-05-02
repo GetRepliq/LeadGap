@@ -16,12 +16,12 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install
-COPY requirements.txt .
+# Copy requirements from the scraper folder
+COPY scraper/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
-COPY . .
+# Copy all files from the scraper folder
+COPY scraper/ .
 
 # Expose port
 EXPOSE 8000
