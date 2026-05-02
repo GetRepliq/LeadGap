@@ -68,7 +68,7 @@ User Accounts & Authentication:
      ✔ Create public.profiles table and auto-creation trigger @done(26-04-29 11:30)
      ✔ Implement Sign Up and Log In UI components @done(26-04-13 18:35)
      ☐ Set up Next.js Auth Middleware for protected routes
-     ☐ Link market_intelligence entries to specific user_ids
+     ✔ Link market_intelligence entries to specific user_ids @done(26-05-02 06:23)
      ✔ Create public.chats table for saving agent conversation history @done(26-04-13 19:10)
-     ☐ Implement side-bar UI for browsing previous chats
-     ☐ Update Agent UI to save/load messages from public.chats
+     ✔ Implement side-bar UI for browsing previous chats @done(26-05-02 06:23)
+     ✔ Update Agent UI to save/load messages from public.chats @done(26-05-02 06:23)
