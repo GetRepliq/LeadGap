@@ -14,14 +14,14 @@ def eprint(*args, **kwargs):
 
 def get_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new") # Use the modern headless mode
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.binary_location = "/usr/bin/google-chrome" # Explicit path in Docker
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
     
-    # In Docker/Render, Chrome is usually at /usr/bin/google-chrome
-    # and we install the matching driver.
     return webdriver.Chrome(options=chrome_options)
 
 def filter_reviews(reviews, min_word_count=5):
