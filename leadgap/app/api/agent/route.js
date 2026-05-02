@@ -1,19 +1,64 @@
 import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory, scrapeReviews, formatGeneratedContent, saveChat } from '../../../lib/agent-functions';
+import { encrypt, decrypt } from '../../../lib/crypto';
+import { createClient } from '@supabase/supabase-js';
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_PRIVATE_SERVICE_ROLE
+);
 
 export async function POST(request) {
-  const { message, userId, chatId, history = [] } = await request.json();
+  const body = await request.json();
+  const { message, userId, chatId, history = [], action, apiKey } = body;
+
+  // --- Action: Save/Encrypt API Key ---
+  if (action === 'save_key' && userId && apiKey) {
+    try {
+      const encryptedKey = encrypt(apiKey);
+      const { error } = await supabaseAdmin
+        .from('profiles')
+        .update({ gemini_api_key: encryptedKey })
+        .eq('id', userId);
+
+      if (error) throw error;
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+    }
+  }
+
+  // --- Main Chat Logic ---
   console.log('Received message:', message);
 
   try {
-    const intentResult = await classifyIntent(message);
+    // 1. Fetch and Decrypt User's API Key
+    let activeApiKey = process.env.GEMINI_API_KEY; // Fallback
+
+    if (userId) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('gemini_api_key')
+        .eq('id', userId)
+        .single();
+
+      if (profile?.gemini_api_key) {
+        try {
+          activeApiKey = decrypt(profile.gemini_api_key);
+        } catch (e) {
+          console.error("Failed to decrypt user API key, using fallback.");
+        }
+      }
+    }
+
+    // 2. Classify Intent
+    const intentResult = await classifyIntent(message, activeApiKey);
     console.log('Intent Classified:', intentResult);
 
     let agentResponse;
 
+    // 3. Process Intent (Passing the activeApiKey to all functions)
     switch (intentResult.intent) {
       case 'extract_reviews':
-        console.log('Intent: extract_reviews - Initiating scraping...');
         const scrapedNicheReviews = await scrapeReviews({
           searchQuery: intentResult.searchQuery,
           mode: "niche",
@@ -21,18 +66,14 @@ export async function POST(request) {
 
         if (scrapedNicheReviews.error) {
           agentResponse = { error: `Scraping error: ${scrapedNicheReviews.error}` };
-        } else if (scrapedNicheReviews.length === 0) {
-          agentResponse = { message: "No reviews found for the specified niche. Please try a different search query." };
         } else {
-          console.log(`Scraped ${scrapedNicheReviews.length} reviews. Analyzing...`);
-          agentResponse = await analyzeReviews(scrapedNicheReviews);
+          agentResponse = await analyzeReviews(scrapedNicheReviews, activeApiKey);
           if (agentResponse && agentResponse.rawJson) {
             await updateMemory(agentResponse.rawJson, intentResult.searchQuery || message);
           }
         }
         break;
       case 'competitor_analysis':
-        console.log('Intent: competitor_analysis - Initiating scraping for competitor...');
         const scrapedCompetitorData = await scrapeReviews({
           searchQuery: `${intentResult.competitorName} in ${intentResult.location}`, 
           mode: "competitor",
@@ -42,27 +83,20 @@ export async function POST(request) {
 
         if (scrapedCompetitorData.error) {
           agentResponse = { error: `Scraping error: ${scrapedCompetitorData.error}` };
-        } else if (!scrapedCompetitorData.business_info || scrapedCompetitorData.reviews.length === 0) {
-          agentResponse = { message: `No data found for competitor "${intentResult.competitorName}" in "${intentResult.location}". Please check the name and location.` };
         } else {
-          console.log(`Scraped data for competitor "${intentResult.competitorName}". Analyzing...`);
-          agentResponse = await analyzeCompetitor(scrapedCompetitorData);
+          agentResponse = await analyzeCompetitor(scrapedCompetitorData, activeApiKey);
         }
         break;
       case 'generate_content':
         if (!intentResult.contentRequest) {
           agentResponse = { error: "Please specify what content you'd like to generate." };
         } else {
-          const contentData = await generateMarketingContent(intentResult.contentRequest);
-          if (contentData.error) {
-            agentResponse = contentData;
-          } else {
-            agentResponse = {
-              content: contentData.content,
-              formattedContent: formatGeneratedContent(contentData.content),
-              intent: 'generate_content'
-            };
-          }
+          const contentData = await generateMarketingContent(intentResult.contentRequest, activeApiKey);
+          agentResponse = contentData.error ? contentData : {
+            content: contentData.content,
+            formattedContent: formatGeneratedContent(contentData.content),
+            intent: 'generate_content'
+          };
         }
         break;
       case 'other':
@@ -71,7 +105,7 @@ export async function POST(request) {
         break;
     }
 
-    // --- Persist to Supabase if userId is provided ---
+    // 4. Persist to Supabase
     let savedChat = null;
     if (userId) {
       const updatedHistory = [
@@ -79,29 +113,17 @@ export async function POST(request) {
         { role: 'user', content: message },
         { role: 'agent', content: agentResponse }
       ];
-
       const title = history.length === 0 ? message.substring(0, 40) : null;
-
-      savedChat = await saveChat({
-        userId,
-        chatId,
-        title,
-        messages: updatedHistory
-      });
+      savedChat = await saveChat({ userId, chatId, title, messages: updatedHistory });
     }
 
     return new Response(JSON.stringify({
       ...agentResponse,
       chatId: savedChat?.id || chatId
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    }), { status: 200 });
+
   } catch (error) {
     console.error('API Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

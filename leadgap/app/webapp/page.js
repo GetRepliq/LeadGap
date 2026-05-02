@@ -16,6 +16,8 @@ export default function AgentPage() {
   const [user, setUser] = useState(null);
   const [chatId, setChatId] = useState(null);
   const [previousChats, setPreviousChats] = useState([]);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [userApiKey, setUserApiKey] = useState("");
   const router = useRouter();
 
   // 1. Fetch user session and their chat history
@@ -25,10 +27,53 @@ export default function AgentPage() {
       if (session) {
         setUser(session.user);
         fetchChats(session.user.id);
+        checkUserProfile(session.user.id);
       }
     };
     getSessionAndChats();
   }, []);
+
+  const checkUserProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('gemini_api_key')
+      .eq('id', userId)
+      .single();
+    
+    if (!data?.gemini_api_key) {
+      setShowKeyModal(true);
+    } else {
+      setUserApiKey(data.gemini_api_key);
+    }
+  };
+
+  const handleSaveKey = async () => {
+    if (!userApiKey.trim()) return;
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'save_key',
+          userId: user.id,
+          apiKey: userApiKey
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setShowKeyModal(false);
+      } else {
+        alert("Failed to secure key: " + data.error);
+      }
+    } catch (e) {
+      alert("System error securing link.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchChats = async (userId) => {
     const { data, error } = await supabase
@@ -354,6 +399,42 @@ export default function AgentPage() {
           </p>
         </div>
       </div>
+
+      {/* ── Key Setup Modal ── */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="w-full max-w-[400px] bg-[#0a0a0a] border border-white/10 p-8 space-y-6 shadow-2xl" style={{ letterSpacing: "-0.025em" }}>
+            <div className="space-y-2">
+              <h2 className="text-xl text-white font-medium">Terminal Activation</h2>
+              <p className="text-xs opacity-50 leading-relaxed">
+                To enable autonomous intelligence, provide your Gemini API key. This will be stored securely in your private profile.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase opacity-40 pl-2">Gemini API Key</label>
+              <input
+                type="password"
+                placeholder="AIzaSy..."
+                value={userApiKey}
+                onChange={(e) => setUserApiKey(e.target.value)}
+                className="w-full bg-transparent border border-white/20 px-4 py-2 outline-none focus:border-white/50 text-white transition-colors text-sm"
+              />
+            </div>
+
+            <button
+              onClick={handleSaveKey}
+              className="w-full bg-white text-black py-2 font-medium hover:bg-white/90 transition-colors text-sm"
+            >
+              Establish Link
+            </button>
+            
+            <p className="text-[9px] opacity-20 text-center uppercase tracking-widest pt-4">
+              LeadGap Security Protocol v4.0.2
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
