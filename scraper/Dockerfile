@@ -1,22 +1,10 @@
-# Use the official Python image
-FROM python:3.9-slim
+# Use the full Python image for better library support
+FROM python:3.9
 
-# Install system dependencies
+# Install Chromium and Chromium Driver
 RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg2 \
-    apt-transport-https \
-    ca-certificates \
-    unzip \
-    curl \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Google Chrome using the modern keyring approach
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable --no-install-recommends \
+    chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -28,6 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all files from the scraper folder
 COPY scraper/ .
+
+# Set environment variables for Selenium
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROME_PATH=/usr/lib/chromium/
 
 # Expose port
 EXPOSE 8000

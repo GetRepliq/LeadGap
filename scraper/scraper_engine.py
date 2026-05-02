@@ -12,17 +12,19 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+from selenium.webdriver.chrome.service import Service
+
 def get_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new") # Use the modern headless mode
+    chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.binary_location = "/usr/bin/google-chrome" # Explicit path in Docker
+    chrome_options.binary_location = "/usr/bin/chromium"
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
     
-    return webdriver.Chrome(options=chrome_options)
+    service = Service(executable_path="/usr/bin/chromedriver")
+    return webdriver.Chrome(service=service, options=chrome_options)
 
 def filter_reviews(reviews, min_word_count=5):
     unique_reviews = []
