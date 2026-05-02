@@ -1,13 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from '@supabase/supabase-js';
-import { spawn } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 
-// --- Supabase Configuration ---
+// --- Configuration ---
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_PRIVATE_SERVICE_ROLE;
+const SCRAPER_URL = "https://leadgap-ybbg.onrender.com/scrape";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -191,7 +189,6 @@ export async function generateMarketingContent(request, apiKey) {
 }
 
 export function formatGeneratedContent(text) {
-  // Simple HTML formatting for ad copy
   return text.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 }
 
@@ -207,20 +204,31 @@ export async function saveChat({ userId, chatId, title, messages }) {
   return error ? null : data;
 }
 
+/**
+ * Calls the Render microservice to scrape reviews.
+ */
 export async function scrapeReviews({ searchQuery, mode = "niche", competitorName, location }) {
-  // Scraper logic...
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const pythonScriptPath = path.resolve(currentDir, '../../cli/core', 'utils.py');
-  const args = [pythonScriptPath, searchQuery, "--mode", mode];
-  if (mode === "competitor") args.push("--location", location);
-
-  return new Promise((resolve) => {
-    const pythonProcess = spawn('python3', args);
-    let stdout = '';
-    pythonProcess.stdout.on('data', (d) => stdout += d.toString());
-    pythonProcess.on('close', (c) => {
-      if (c === 0) resolve(JSON.parse(stdout));
-      else resolve({ error: "Scraper failed" });
+  try {
+    const response = await fetch(SCRAPER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: searchQuery,
+        mode,
+        location,
+        max_businesses: 3,
+        reviews_per_business: 10
+      })
     });
-  });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || "Scraper request failed");
+    }
+
+    return await response.json();
+  } catch (e) {
+    console.error("[agent] Scraper error:", e.message);
+    return { error: e.message };
+  }
 }
