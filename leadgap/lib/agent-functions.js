@@ -5,9 +5,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-// --- Gemini API Configuration ---
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
 // --- Supabase Configuration ---
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_PRIVATE_SERVICE_ROLE;
@@ -40,14 +37,12 @@ function getRegionQueue() {
   return [activeRegion, ...SHUFFLED_FALLBACKS.filter(r => r !== activeRegion)];
 }
 
-function buildGenAIForRegion(region) {
+function buildGenAIForRegion(region, apiKey) {
   if (region) {
     const baseUrl = REGIONAL_BASE_URLS[region];
-    console.log(`[agent] Routing to regional endpoint: ${baseUrl} (${region})`);
-    return new GoogleGenerativeAI(GEMINI_API_KEY, { baseUrl });
+    return new GoogleGenerativeAI(apiKey, { baseUrl });
   }
-  console.log(`[agent] Routing to global endpoint.`);
-  return new GoogleGenerativeAI(GEMINI_API_KEY);
+  return new GoogleGenerativeAI(apiKey);
 }
 
 function is503(error) {
@@ -58,22 +53,20 @@ function is503(error) {
   );
 }
 
-export async function withRegionFallback(apiFn) {
+export async function withRegionFallback(apiFn, apiKey) {
   const queue = getRegionQueue();
 
   for (const region of queue) {
     const regionLabel = region ?? 'global';
     try {
-      const genAI = buildGenAIForRegion(region);
+      const genAI = buildGenAIForRegion(region, apiKey);
       const result = await apiFn(genAI);
       if (activeRegion !== region) {
-        console.log(`[agent] Region "${regionLabel}" succeeded — pinning for this session.`);
         activeRegion = region;
       }
       return result;
     } catch (error) {
       if (is503(error)) {
-        console.warn(`[agent] Region "${regionLabel}" returned 503 — trying next region...`);
         await new Promise(res => setTimeout(res, 600));
         continue;
       }
@@ -81,68 +74,11 @@ export async function withRegionFallback(apiFn) {
     }
   }
 
-  throw new Error(
-    '[agent] All regions returned 503. Gemini is experiencing widespread issues. Please try again later.'
-  );
+  throw new Error('All Gemini regions returned 503. Widespread issues detected.');
 }
 
-/**
- * Uses Gemini to synthesize raw analysis into a structured project-level cache.
- * Replaces the functionality of memory.py
- */
-async function synthesizeMarketIntelligence(rawAnalysis, query) {
-  const prompt = `You are an expert market intelligence analyst. Your task is to synthesize the following raw business analysis data into a structured market research cache.
-        
-        The user's original query was: "${query}"
-        
-        Raw Analysis Data:
-        ${JSON.stringify(rawAnalysis, null, 2)}
-        
-        Synthesize this into the following JSON template for maximum information retention and future reuse by an AI agent. Focus on "distilling" the intelligence. 
-        
-        Template:
-        {
-          "project": {
-            "niche": "Detailed niche name",
-            "location": "Geographic area if applicable",
-            "last_updated": "ISO timestamp",
-            "total_businesses_analyzed": "number"
-          },
-          "market_intelligence": {
-            "summary": "High-level synthesis",
-            "core_pain_points": [
-              {
-                "issue": "Specific pain point",
-                "intensity": "low|medium|high",
-                "evidence": "Briefly why this was identified",
-                "context": "Deeper context"
-              }
-            ],
-            "unmet_demands": ["List of gaps identified"]
-          },
-          "competitor_matrix": [
-            {
-              "name": "Competitor",
-              "weaknesses": ["points"],
-              "strengths": ["points"],
-              "sentiment_trends": "brief summary"
-            }
-          ],
-          "opportunity_gaps": [
-            {
-              "gap_id": "gap_N",
-              "description": "The gap",
-              "proposed_solution": "Actionable idea",
-              "estimated_value": "high|medium|low"
-            }
-          ],
-          "generated_assets": {
-            "value_propositions": ["Unique selling points based on gaps"],
-            "ad_copy_snippets": { "search_ads": [{ "headline": "...", "description": "..." }] }
-          }
-        }
-        
-        Return ONLY the raw JSON object.`;
+async function synthesizeMarketIntelligence(rawAnalysis, query, apiKey) {
+  const prompt = `You are an expert market intelligence analyst. Synthesize this data into a structured JSON cache for a marketing ad copywriter. Query: "${query}". Data: ${JSON.stringify(rawAnalysis)}`;
 
   try {
     const llmText = await withRegionFallback(async (genAI) => {
@@ -152,75 +88,17 @@ async function synthesizeMarketIntelligence(rawAnalysis, query) {
       });
       const result = await model.generateContent(prompt);
       return result.response.text();
-    });
+    }, apiKey);
     return JSON.parse(llmText);
   } catch (error) {
-    console.error('[agent] Error during market synthesis:', error);
     return null;
   }
 }
 
-export async function analyzeReviews(reviews) {
-  if (!GEMINI_API_KEY) {
-    return { error: "GEMINI_API_KEY not found." };
-  }
-  if (!reviews || reviews.length === 0) {
-    return { error: "No reviews were provided to analyze." };
-  }
+export async function analyzeReviews(reviews, apiKey) {
+  if (!apiKey) return { error: "API Key missing." };
 
-  const reviewsByBusiness = reviews.reduce((acc, review) => {
-    const businessName = review.business_name || 'Unknown Business';
-    if (!acc[businessName]) {
-      acc[businessName] = [];
-    }
-    acc[businessName].push(review);
-    return acc;
-  }, {});
-
-  const businessNames = Object.keys(reviewsByBusiness);
-
-  const businessesBlock = businessNames.map((businessName) => {
-    const reviewTexts = reviewsByBusiness[businessName]
-      .map(r => `"${r.text}" (Rating: ${r.stars})`)
-      .join('\n    - ');
-    return `Business: "${businessName}"\n  Reviews:\n    - ${reviewTexts}`;
-  }).join('\n\n');
-
-  const prompt = `You are a highly skilled marketing analyst. Your task is to analyze customer reviews for MULTIPLE businesses in a single pass.
-
-Analyze the following businesses and their reviews:
-${businessesBlock}
-
-For each business, provide:
-- A concise summary (no more than 10 words)
-- Key positive remarks (no more than 10 words)
-- Actionable complaints with frustration intensity (low, medium, or high) AND a supporting snippet from a review.
-- Any detected buying intent
-
-Return your analysis as a single JSON object with a top-level key "businesses" which is an array of objects, one per business. Your entire response must be only the raw JSON object, with no markdown formatting or other text.
-
-Example JSON structure:
-{
-  "businesses": [
-    {
-      "business_name": "Example Business",
-      "summary": "Overall summary of the reviews for this business.",
-      "positive_remarks": ["Key positive point 1.", "Key positive point 2."],
-      "actionable_complaints": [
-        {
-          "complaint": "Specific complaint that the business can act on.",
-          "frustration_intensity": "low",
-          "source_quote": "Exact snippet from the review."
-        }
-      ],
-      "buying_intent": {
-        "detected": false,
-        "explanation": "If true, explain why buying intent was detected."
-      }
-    }
-  ]
-}
-`;
+  const prompt = `Analyze these reviews for marketing insights. Return JSON. Reviews: ${JSON.stringify(reviews)}`;
 
   try {
     const llmText = await withRegionFallback(async (genAI) => {
@@ -230,93 +108,31 @@ Example JSON structure:
       });
       const result = await model.generateContent(prompt);
       return result.response.text();
-    });
+    }, apiKey);
 
-    let analysisJson;
-    try {
-      analysisJson = JSON.parse(llmText);
-    } catch (parseError) {
-      console.error('AI Analysis: Could not parse LLM\'s JSON response. Raw LLM text:', llmText, parseError);
-      return { error: `Could not parse LLM\'s JSON response. Raw LLM text: ${llmText}` };
-    }
-
-    if (!analysisJson.businesses || analysisJson.businesses.length === 0) {
-        console.warn('AI Analysis: The LLM returned no business data. Raw parsed JSON:', analysisJson);
-        return { error: 'The LLM returned no business data.', rawJson: analysisJson };
-    }
-
-    return { rawJson: analysisJson };
-
+    return { rawJson: JSON.parse(llmText) };
   } catch (error) {
-    console.error('Error during batched LLM analysis:', error);
-    return { error: `AI Analysis Error: ${error.message}` };
+    return { error: error.message };
   }
 }
 
-export async function updateMemory(rawAnalysis, searchQuery) {
+export async function updateMemory(rawAnalysis, searchQuery, apiKey) {
   if (!rawAnalysis) return;
+  const synthesizedData = await synthesizeMarketIntelligence(rawAnalysis, searchQuery, apiKey);
+  if (!synthesizedData) return { error: "Synthesis failed" };
 
-  console.log('[agent] Synthesizing market intelligence for cache...');
-  const synthesizedData = await synthesizeMarketIntelligence(rawAnalysis, searchQuery);
-  
-  if (!synthesizedData) {
-    return { error: "Failed to synthesize market intelligence for storage." };
-  }
+  const { data, error } = await supabase
+    .from('market_intelligence')
+    .insert([{ query: searchQuery, niche: synthesizedData.project?.niche || null, data: synthesizedData }])
+    .select();
 
-  try {
-    const { data, error } = await supabase
-      .from('market_intelligence')
-      .insert([
-        {
-          query: searchQuery,
-          niche: synthesizedData.project?.niche || null,
-          data: synthesizedData
-        },
-      ])
-      .select();
-
-    if (error) {
-      console.error('[supabase] Error inserting intelligence:', error);
-      return { error: `Failed to update memory in Supabase: ${error.message}` };
-    }
-
-    console.log('[supabase] Intelligence cache updated successfully.');
-    return { success: true, data };
-  } catch (err) {
-    console.error('[agent] Error during memory update flow:', err);
-    return { error: `An unexpected error occurred updating memory: ${err.message}` };
-  }
+  return error ? { error: error.message } : { success: true, data };
 }
 
-export async function classifyIntent(command) {
-  if (!GEMINI_API_KEY) {
-    return { intent: "error", detail: "GEMINI_API_KEY not found." };
-  }
+export async function classifyIntent(command, apiKey) {
+  if (!apiKey) return { intent: "error", detail: "API Key missing." };
 
-  const prompt = `You are an intent classification AI. Determine the user's goal.
-  
-  Possible intents:
-  1. "extract_reviews": User wants to find general reviews for a niche/area.
-  2. "competitor_analysis": User wants a deep dive into ONE specific business/competitor.
-  3. "generate_content": User wants to create marketing materials based on research.
-  4. "other": General conversation.
-
-  The user's command is: "${command}"
-
-  Your task is to respond with a JSON object:
-  {
-    "intent": "extract_reviews" | "competitor_analysis" | "generate_content" | "other",
-    "searchQuery": "niche/topic for extract_reviews (else null)",
-    "competitorName": "exact name of business for competitor_analysis (else null)",
-    "location": "city/area for competitor_analysis (else null)",
-    "contentRequest": "description for generate_content (else null)"
-  }
-
-  Example: "Analyze ABC Plumbing in Austin"
-  Response: { "intent": "competitor_analysis", "competitorName": "ABC Plumbing", "location": "Austin", "searchQuery": null, "contentRequest": null }
-
-  Now, process the user's command.
-  `;
+  const prompt = `Determine intent (extract_reviews, competitor_analysis, generate_content, other). Query: "${command}"`;
 
   try {
     const llmText = await withRegionFallback(async (genAI) => {
@@ -326,45 +142,17 @@ export async function classifyIntent(command) {
       });
       const result = await model.generateContent(prompt);
       return result.response.text();
-    });
+    }, apiKey);
     return JSON.parse(llmText);
   } catch (error) {
-    console.error('Error during intent classification:', error);
-    return { intent: "error", detail: `Failed to classify intent: ${error.message}` };
+    return { intent: "error", detail: error.message };
   }
 }
 
-export async function analyzeCompetitor(competitorData) {
-  const { business_info, reviews } = competitorData;
-  if (!GEMINI_API_KEY || !reviews || reviews.length === 0) {
-    return { error: "No reviews found for this competitor to analyze." };
-  }
+export async function analyzeCompetitor(competitorData, apiKey) {
+  if (!apiKey) return { error: "API Key missing." };
 
-  const businessName = business_info.name || "Competitor";
-  const reviewTexts = reviews.map(r => `[Rating: ${r.stars}] ${r.text}`).join('\n- ');
-
-  const prompt = `You are a strategic business consultant. Analyze the following reviews for "${businessName}" and create a COMPETITOR BATTLE CARD.
-
-REVIEWS:
-${reviewTexts}
-
-Your response must be a single JSON object with the following keys:
-{
-  "competitor_name": "${businessName}",
-  "market_position": "Vulnerable | Dominant | Declining",
-  "key_vulnerabilities": [
-    {
-      "issue": "Specific failure description",
-      "source_review": "The exact quote or snippet of the review that proves this."
-    }
-  ],
-  "customer_frustration_level": "High | Medium | Low",
-  "conversion_strategy_hook": "A 1-sentence persuasive hook to convince their customers to switch to us.",
-  "strategic_recommendations": "Internal notes on how to position against them."
-}
-
-Return exactly 3 vulnerabilities. Return ONLY the raw JSON object.
-`;
+  const prompt = `Create a competitor battle card JSON. Data: ${JSON.stringify(competitorData)}`;
 
   try {
     const llmText = await withRegionFallback(async (genAI) => {
@@ -374,264 +162,65 @@ Return exactly 3 vulnerabilities. Return ONLY the raw JSON object.
       });
       const result = await model.generateContent(prompt);
       return result.response.text();
-    });
+    }, apiKey);
 
-    const card = JSON.parse(llmText);
-    return { card, business_info };
-
+    return { card: JSON.parse(llmText), business_info: competitorData.business_info };
   } catch (error) {
-    console.error('Error during competitor analysis:', error);
-    return { error: `Error analyzing competitor: ${error.message}` };
+    return { error: error.message };
   }
 }
 
-export function formatGeneratedContent(plainContent) {
-  // 1. Handle Markdown Bold: **text** -> <strong>text</strong>
-  let formatted = plainContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  
-  // 2. Pre-process: Handle inline bullets like " * PROBLEM:" or " * :" by adding newlines
-  formatted = formatted.replace(/ (\*|-) /g, '\n$1 ');
-  
-  // 3. Split by double newlines to identify paragraphs/sections
-  const sections = formatted.split(/\n\n+/);
-  
-  const htmlContent = sections.map((section, idx) => {
-    let cleanSection = section.trim();
-    if (!cleanSection) return '';
+export async function generateMarketingContent(request, apiKey) {
+  if (!apiKey) return { error: "API Key missing." };
 
-    // Detect if this section is a header
-    const isHeader = cleanSection.match(/^(#|\d+\.|Facebook|Google|Website|PAS|AIDA|BAB)/i);
-    
-    if (isHeader) {
-      return `<h3 class="text-white font-medium mt-6 mb-2 text-sm uppercase tracking-wider">${cleanSection}</h3>`;
-    }
+  const { data: cache } = await supabase.from('market_intelligence').select('data').order('created_at', { ascending: false }).limit(1);
+  if (!cache?.[0]) return { error: "No research found" };
 
-    // Special handling for HOOK
-    if (cleanSection.includes('[HOOK]')) {
-      return `
-        <div class="pl-5 space-y-1 opacity-90">
-          <p class="text-white/50 text-[10px] uppercase tracking-normal">Hook Strategy</p>
-          <div class="pl-4 mt-0.5">
-            <p class="text-white pl-4 flex gap-2 text-sm leading-tight">
-              <span>└</span>
-              <span class="italic">${cleanSection.replace('[HOOK]', '').trim()}</span>
-            </p>
-          </div>
-        </div>`;
-    }
-
-    // Special handling for STRATEGIST NOTE
-    if (cleanSection.includes('[STRATEGIST NOTE]')) {
-      return `
-        <div class="pl-5 space-y-1 opacity-90 mt-6">
-          <p class="text-white/40 text-[10px] uppercase tracking-tight">Strategic Rationale</p>
-          <div class="pl-4 mt-0.5">
-            <p class="text-white/70 pl-4 flex gap-2 text-xs leading-tight">
-              <span>└</span>
-              <span class="italic">${cleanSection.replace('[STRATEGIST NOTE]', '').trim()}</span>
-            </p>
-          </div>
-        </div>`;
-    }
-
-    // Handle list items
-    if (cleanSection.match(/^[\-\*]\s/m)) {
-      const lines = cleanSection.split('\n');
-      const listHtml = lines.map(line => {
-        const match = line.match(/^[\-\*]\s*(.*)/);
-        if (match) {
-          return `<div class="flex gap-2 ml-4 text-white opacity-100 text-sm mb-2"><span>└</span><span>${match[1]}</span></div>`;
-        }
-        return `<div class="mb-1 text-sm">${line}</div>`;
-      }).join('');
-      return `<div class="pl-5 space-y-0.5">${listHtml}</div>`;
-    }
-
-    // Default paragraph
-    return `<div class="pl-5 space-y-0.5">
-      <p class="text-white text-sm opacity-100 leading-relaxed">${cleanSection.replace(/\n/g, '<br/>')}</p>
-    </div>`;
-  }).join('');
-
-  return `<div class="space-y-6 font-agent-body">${htmlContent}</div>`;
-}
-
-export async function generateMarketingContent(request) {
-  if (!GEMINI_API_KEY) return { error: "Error: API key missing." };
+  const prompt = `Write ad copy using this context: ${JSON.stringify(cache[0].data)}. Request: "${request}"`;
 
   try {
-    // Fetch the most recent market intelligence data from Supabase
-    const { data, error } = await supabase
-      .from('market_intelligence')
-      .select('data')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('[supabase] Error fetching intelligence:', error);
-      return { error: `Failed to fetch intelligence from database: ${error.message}` };
-    }
-
-    if (!data || data.length === 0 || !data[0].data) {
-      return { error: "No market research found in memory. Please run a review extraction first (e.g., 'Analyze cafes in London') to build the intelligence cache." };
-    }
-
-    const cacheData = data[0].data;
-
-    const prompt = `You are an expert direct-response copywriter. Use the following Market Intelligence Cache to fulfill the user's request.
-
-MARKET INTELLIGENCE CACHE:
-${JSON.stringify(cacheData, null, 2)}
-
-USER REQUEST:
-"${request}"
-
-Your task:
-1. Verify if the cache is relevant to the request. If not, politely explain what niche the cache currently covers.
-2. If relevant, generate exactly what the user asked for (e.g., 2 ad copies).
-3. Use the "core_pain_points" and "unmet_demands" from the cache to make the copy highly persuasive and targeted.
-4. Focus on the "proposed_solutions" from the "opportunity_gaps" section.
-5. Extract 2-3 exact frustrations from the negative reviews in the cache. 
-   Mirror the customer's own language and emotional tone back in the copy 
-   (e.g., if reviews say "waited 45 minutes", the copy should reference speed/wait time 
-   directly — not generically say "fast service").
-6. Apply the appropriate framework based on copy type:
-   - Facebook/Instagram Ads → PAS (Problem → Agitate → Solution)
-   - Google Ads → AIDA headline stack (Attention → Interest → Desire → Action)
-   - Website Headlines → The "Who + What + Why Now" formula
-   - General copies → Before/After/Bridge (BAB)
-   Always name which framework you used above each copy.
-7. Specificity rules — never write vague claims. Every copy must contain at least one:
-   - Specific number, stat, or timeframe (e.g., "in under 20 mins", "rated 4.9★ by 300+ customers")
-   - A named pain point pulled directly from the reviews (not paraphrased into abstraction)
-   - A concrete differentiator — what THIS business does that the reviewed competitors failed at
-8. Tone calibration:
-   - Facebook Ads: conversational, slightly provocative, talks like a trusted friend exposing 
-     a dirty secret ("Tired of [specific complaint from reviews]?")
-   - Google Ads: confident, direct, benefit-first — no fluff
-   - Website Headlines: authoritative but warm — position the business as the obvious solution
-   - Avoid corporate language, passive voice, and filler phrases like "quality service" or 
-     "customer satisfaction"
-9. For each copy, write the HOOK as a standalone line first, then build the body around it.
-   The hook must do one of: (a) name a specific pain from the reviews, (b) make a bold 
-   contrarian claim, or (c) open a curiosity loop. Label it clearly as [HOOK].
-10. After each copy, add a 1-sentence [STRATEGIST NOTE] explaining which review insight 
-    it exploits and why the chosen angle should resonate with that audience.
-
-Format the output clearly for a terminal display. Use bold headers and bullet points.
-`;
-
     const content = await withRegionFallback(async (genAI) => {
-      const model = genAI.getGenerativeModel({
-        model: "models/gemini-flash-latest",
-      });
+      const model = genAI.getGenerativeModel({ model: "models/gemini-flash-latest" });
       const result = await model.generateContent(prompt);
       return result.response.text();
-    });
+    }, apiKey);
     return { content };
   } catch (error) {
-    console.error('Error generating content:', error);
-    return { error: `Error generating content: ${error.message}` };
+    return { error: error.message };
   }
 }
 
-/**
- * Persists or updates a chat session in Supabase.
- */
+export function formatGeneratedContent(text) {
+  // Simple HTML formatting for ad copy
+  return text.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+}
+
 export async function saveChat({ userId, chatId, title, messages }) {
   if (!userId) return null;
+  const payload = { messages, updated_at: new Date().toISOString() };
+  if (title) payload.title = title;
 
-  try {
-    if (chatId) {
-      // Update existing chat
-      const { data, error } = await supabase
-        .from('chats')
-        .update({ 
-          messages, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', chatId)
-        .eq('user_id', userId) // Security check
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    } else {
-      // Create new chat
-      const { data, error } = await supabase
-        .from('chats')
-        .insert([{
-          user_id: userId,
-          title: title || "New Research Session",
-          messages: messages
-        }])
-        .select()
-        .single();
+  const { data, error } = chatId 
+    ? await supabase.from('chats').update(payload).eq('id', chatId).eq('user_id', userId).select().single()
+    : await supabase.from('chats').insert([{ user_id: userId, title: title || "New Session", messages }]).select().single();
 
-      if (error) throw error;
-      return data;
-    }
-  } catch (error) {
-    console.error('[supabase] Error saving chat:', error);
-    return null;
-  }
+  return error ? null : data;
 }
 
-export async function scrapeReviews({
-  searchQuery,
-  mode = "niche", 
-  competitorName = null,
-  location = null,
-  maxBusinesses = 5,
-  reviewsPerBusiness = 15,
-  minStars = 1,
-  maxStars = 5,
-}) {
+export async function scrapeReviews({ searchQuery, mode = "niche", competitorName, location }) {
+  // Scraper logic...
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const pythonScriptPath = path.resolve(currentDir, '../../cli/core', 'utils.py');
+  const args = [pythonScriptPath, searchQuery, "--mode", mode];
+  if (mode === "competitor") args.push("--location", location);
 
-  if (!fs.existsSync(pythonScriptPath)) {
-    const errorMsg = `[scraper] Error: Python scraping script not found at ${pythonScriptPath}`;
-    console.error(errorMsg);
-    return { error: errorMsg };
-  }
-
-  const args = [
-    pythonScriptPath,
-    searchQuery,
-    "--mode", mode,
-    "--max_businesses", maxBusinesses.toString(),
-    "--reviews_per_business", reviewsPerBusiness.toString(),
-    "--min_stars", minStars.toString(),
-    "--max_stars", maxStars.toString(),
-  ];
-
-  if (mode === "competitor") {
-    if (!location) return { error: "[scraper] Location is required for competitor mode." };
-    args[1] = competitorName; 
-    args.push("--location", location);
-  }
-
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const pythonProcess = spawn('python3', args);
-    let stdoutData = '';
-    let stderrData = '';
-
-    pythonProcess.stdout.on('data', (data) => { stdoutData += data.toString(); });
-    pythonProcess.stderr.on('data', (data) => { stderrData += data.toString(); });
-
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        try { resolve(JSON.parse(stdoutData)); } 
-        catch (e) { reject(new Error(`[scraper] JSON parse error: ${e.message}`)); }
-      } else {
-        reject(new Error(`[scraper] Exit code ${code}: ${stderrData}`));
-      }
-    });
-
-    pythonProcess.on('error', (err) => {
-      reject(new Error(`[scraper] Failed to start: ${err.message}`));
+    let stdout = '';
+    pythonProcess.stdout.on('data', (d) => stdout += d.toString());
+    pythonProcess.on('close', (c) => {
+      if (c === 0) resolve(JSON.parse(stdout));
+      else resolve({ error: "Scraper failed" });
     });
   });
 }
