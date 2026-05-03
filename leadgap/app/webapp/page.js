@@ -291,6 +291,12 @@ export default function AgentPage() {
                       Input: {response.query}
                     </div>
                     
+                    {response.error && (
+                      <div className="text-red-400/90 border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
+                        {response.error}
+                      </div>
+                    )}
+
                     {/* Market Analysis View */}
                     {response.rawJson?.businesses?.map((biz, bIdx) => (
                       <div key={bIdx} className="space-y-1">

@@ -1,4 +1,7 @@
 import { classifyIntent, analyzeReviews, analyzeCompetitor, generateMarketingContent, updateMemory, scrapeReviews, formatGeneratedContent, saveChat } from '../../../lib/agent-functions';
+
+/** Allow niche scraping + Gemini analysis to finish before Vercel kills the route (requires paid tier for >60s). */
+export const maxDuration = 120;
 import { encrypt, decrypt } from '../../../lib/crypto';
 import { createClient } from '@supabase/supabase-js';
 
@@ -64,6 +67,7 @@ export async function POST(request) {
         const scrapedNicheReviews = await scrapeReviews({
           searchQuery: query,
           mode: "niche",
+          location: intentResult.location,
         });
 
         if (scrapedNicheReviews.error) {
@@ -81,7 +85,11 @@ export async function POST(request) {
         if (!intentResult.competitorName) {
           console.warn('Competitor analysis requested but name missing. Downgrading to extract_reviews.');
           const fallbackQuery = intentResult.searchQuery || message;
-          const fallbackReviews = await scrapeReviews({ searchQuery: fallbackQuery, mode: "niche" });
+          const fallbackReviews = await scrapeReviews({
+            searchQuery: fallbackQuery,
+            mode: "niche",
+            location: intentResult.location,
+          });
           agentResponse = fallbackReviews.error ? { error: fallbackReviews.error } : await analyzeReviews(fallbackReviews, activeApiKey);
           break;
         }

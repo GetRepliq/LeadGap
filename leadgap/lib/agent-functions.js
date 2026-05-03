@@ -239,11 +239,14 @@ export async function scrapeReviews({ searchQuery, mode = "niche", competitorNam
 
   console.log("[agent] Sending payload to Render:", JSON.stringify(payload));
 
+  const scraperMs = Number(process.env.SCRAPER_FETCH_TIMEOUT_MS) || 110000;
+
   try {
     const response = await fetch(SCRAPER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(scraperMs),
     });
 
     if (!response.ok) {
@@ -254,7 +257,14 @@ export async function scrapeReviews({ searchQuery, mode = "niche", competitorNam
 
     return await response.json();
   } catch (e) {
-    console.error("[agent] Fetch error during scraping:", e.message);
-    return { error: e.message };
+    const aborted =
+      e?.name === "AbortError" ||
+      e?.name === "TimeoutError" ||
+      /aborted|timeout/i.test(String(e?.message));
+    const msg = aborted
+      ? `Scraper request timed out after ${scraperMs}ms (increase SCRAPER_FETCH_TIMEOUT_MS or Vercel maxDuration)`
+      : e.message;
+    console.error("[agent] Fetch error during scraping:", msg);
+    return { error: msg };
   }
 }

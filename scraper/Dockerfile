@@ -17,12 +17,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all files from the scraper folder
 COPY scraper/ .
 
-# Set environment variables for Selenium
+# Selenium / logging (stderr visible in Render logs immediately)
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROME_PATH=/usr/lib/chromium/
+ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Long requests: keep-alive helps slow Scrapes; tune on Render if needed
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "120"]
