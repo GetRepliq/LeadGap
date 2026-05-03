@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import sys
 import time
@@ -16,6 +17,16 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 
 def eprint(*args: Any, **kwargs: Any) -> None:
     print(*args, file=sys.stderr, **kwargs)
+
+
+def _scrape_budget_deadline() -> float:
+    """Wall-clock limit so the API responds before upstream (Vercel) fetch timeout."""
+    sec = float(os.environ.get("SCRAPE_BUDGET_SEC", "78"))
+    return time.monotonic() + sec
+
+
+def _over_budget(deadline: float) -> bool:
+    return time.monotonic() > deadline
 
 
 def get_driver():
@@ -84,7 +95,7 @@ def _maps_search_url(search_query: str, location: Optional[str]) -> str:
 
 
 def dismiss_cookie_consent(driver) -> None:
-    short_wait = WebDriverWait(driver, 5)
+    short_wait = WebDriverWait(driver, 2)
     attempts = [
         (By.CSS_SELECTOR, "button[aria-label*='Reject']"),
         (By.CSS_SELECTOR, "button[aria-label*='reject']"),
@@ -96,13 +107,13 @@ def dismiss_cookie_consent(driver) -> None:
         try:
             btn = short_wait.until(EC.element_to_be_clickable((by, sel)))
             btn.click()
-            time.sleep(0.6)
+            time.sleep(0.4)
             return
         except Exception:
             continue
 
 
-def scroll_results_feed(driver, rounds: int = 8) -> None:
+def scroll_results_feed(driver, rounds: int = 4) -> None:
     try:
         feed = driver.find_element(By.CSS_SELECTOR, "div[role='feed']")
         for _ in range(rounds):
@@ -110,7 +121,7 @@ def scroll_results_feed(driver, rounds: int = 8) -> None:
                 "arguments[0].scrollTop = arguments[0].scrollHeight",
                 feed,
             )
-            time.sleep(0.35)
+            time.sleep(0.22)
     except Exception as ex:
         eprint("[scraper] feed scroll skipped:", ex)
 
@@ -166,21 +177,22 @@ def collect_place_targets(driver, max_businesses: int) -> List[Dict[str, str]]:
     return targets[:max_businesses]
 
 
-def open_reviews_tab(driver) -> bool:
-    selectors = [
-        (By.XPATH, "//button[@role='tab'][contains(., 'Reviews')]"),
-        (By.CSS_SELECTOR, "button[aria-label*='Reviews']"),
-        (By.XPATH, "//div[@role='tab'][contains(., 'Reviews')]"),
-    ]
-    for by, sel in selectors:
-        try:
-            tab = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((by, sel)))
-            tab.click()
-            time.sleep(1.5)
-            return True
-        except Exception:
-            continue
-    return False
+def open_reviews_tab(driver, timeout: float = 5.0) -> bool:
+    # One combined wait — old code tried up to 3×8s (~24s) per place.
+    xpath = (
+        "//button[@role='tab'][contains(., 'Reviews')] | "
+        "//div[@role='tab'][contains(., 'Reviews')] | "
+        "//button[contains(@aria-label, 'Reviews')]"
+    )
+    try:
+        tab = WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable((By.XPATH, xpath))
+        )
+        tab.click()
+        time.sleep(0.65)
+        return True
+    except Exception:
+        return False
 
 
 def extract_review_blocks(driver, reviews_per_business: int, target_name: str, min_stars: float, max_stars: float) -> List[dict]:
@@ -227,8 +239,12 @@ def scrape_all_business_reviews(
 ) -> List[dict]:
     driver = get_driver()
     all_reviews_data: List[dict] = []
+    deadline = _scrape_budget_deadline()
 
     try:
+        driver.set_page_load_timeout(int(os.environ.get("PAGE_LOAD_TIMEOUT_SEC", "32")))
+        driver.set_script_timeout(int(os.environ.get("SCRIPT_TIMEOUT_SEC", "25")))
+
         url = _maps_search_url(search_query, location)
         eprint("[scraper] niche maps URL:", url)
         driver.get(url)
@@ -237,8 +253,11 @@ def scrape_all_business_reviews(
 
         loaded = False
         for css in ("div[role='feed']", "div[role='article']"):
+            if _over_budget(deadline):
+                eprint("[scraper] budget hit while waiting for results")
+                return filter_reviews(all_reviews_data)
             try:
-                WebDriverWait(driver, 18).until(
+                WebDriverWait(driver, 12).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, css))
                 )
                 loaded = True
@@ -249,7 +268,7 @@ def scrape_all_business_reviews(
             eprint("[scraper] timeout waiting for results feed/articles")
             return []
 
-        time.sleep(1)
+        time.sleep(0.45)
         targets = collect_place_targets(driver, max_businesses)
         eprint("[scraper] targets collected:", len(targets), json.dumps([t["name"] for t in targets]))
 
@@ -261,13 +280,16 @@ def scrape_all_business_reviews(
         xs = float(max_stars)
 
         for target in targets:
+            if _over_budget(deadline):
+                eprint("[scraper] budget exhausted — returning partial niche results")
+                break
             try:
                 driver.get(target["link"])
-                time.sleep(2)
-                if not open_reviews_tab(driver):
+                time.sleep(0.9)
+                if not open_reviews_tab(driver, timeout=5.0):
                     eprint("[scraper] reviews tab not found for:", target["name"])
                     continue
-                time.sleep(1)
+                time.sleep(0.45)
                 rows = extract_review_blocks(
                     driver, reviews_per_business, target["name"], ms, xs
                 )
@@ -291,26 +313,32 @@ def scrape_competitor_reviews(
     max_stars: int = 5,
 ) -> Dict[str, Any]:
     driver = get_driver()
+    deadline = _scrape_budget_deadline()
     try:
+        driver.set_page_load_timeout(int(os.environ.get("PAGE_LOAD_TIMEOUT_SEC", "32")))
+        driver.set_script_timeout(int(os.environ.get("SCRIPT_TIMEOUT_SEC", "25")))
+
         search_query = f"{competitor_name} {location}".strip()
         url = _maps_search_url(search_query, None)
         eprint("[scraper] competitor maps URL:", url)
         driver.get(url)
-        time.sleep(3)
+        time.sleep(1.5)
 
         dismiss_cookie_consent(driver)
 
         if "place/" not in driver.current_url:
             try:
-                WebDriverWait(driver, 12).until(
+                if _over_budget(deadline):
+                    return {"business_info": {"name": competitor_name, "website": "N/A", "phone": "N/A", "address": "N/A"}, "reviews": []}
+                WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div[role='feed'], div[role='article']"))
                 )
-                scroll_results_feed(driver, rounds=4)
-                link_el = WebDriverWait(driver, 10).until(
+                scroll_results_feed(driver, rounds=3)
+                link_el = WebDriverWait(driver, 8).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "a.hfpxzc, a[href*='/maps/place/']"))
                 )
                 link_el.click()
-                time.sleep(3)
+                time.sleep(1.8)
             except Exception as ex:
                 eprint("[scraper] competitor first-result click failed:", ex)
 
@@ -325,7 +353,7 @@ def scrape_competitor_reviews(
         except Exception:
             pass
 
-        if not open_reviews_tab(driver):
+        if not open_reviews_tab(driver, timeout=6.0):
             eprint("[scraper] competitor reviews tab missing")
             return {"business_info": biz_info, "reviews": []}
 
