@@ -18,11 +18,27 @@ def get_driver():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    # Memory optimization flags for 512MB RAM
     chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--blink-settings=imagesEnabled=false") # Speed up by disabling images
+    chrome_options.add_argument("--disable-plugins")
+    chrome_options.add_argument("--blink-settings=imagesEnabled=false") # Disable images for speed/memory
+    chrome_options.add_argument("--disable-background-networking")
+    chrome_options.add_argument("--disable-default-apps")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--disable-translate")
+    chrome_options.add_argument("--hide-scrollbars")
+    chrome_options.add_argument("--mute-audio")
+    chrome_options.add_argument("--no-first-run")
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-client-side-phishing-detection")
+    chrome_options.add_argument("--disable-component-extensions-with-background-pages")
+    chrome_options.add_argument("--aggressive-cache-discard") # Discard cache more aggressively
+    chrome_options.add_argument("--memory-pressure-off") # Turn off memory pressure notifications
     chrome_options.binary_location = "/usr/bin/chromium"
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
-    
+
     service = Service(executable_path="/usr/bin/chromedriver")
     return webdriver.Chrome(service=service, options=chrome_options)
 
@@ -41,7 +57,7 @@ def scrape_all_business_reviews(search_query, max_businesses=3, reviews_per_busi
     driver = get_driver()
     wait = WebDriverWait(driver, 15)
     all_reviews_data = []
-    
+
     try:
         search_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}"
         driver.get(search_url)
@@ -56,7 +72,7 @@ def scrape_all_business_reviews(search_query, max_businesses=3, reviews_per_busi
         # 1. Direct-Hit Optimization: Collect all target URLs first
         business_listing_selector = "a.hfpxzc"
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, business_listing_selector)))
-        
+
         listings = driver.find_elements(By.CSS_SELECTOR, "div[role='article']")
         targets = []
         for biz in listings[:max_businesses]:
@@ -82,7 +98,7 @@ def scrape_all_business_reviews(search_query, max_businesses=3, reviews_per_busi
                         reviews_tab = wait.until(EC.element_to_be_clickable((by, s)))
                         break
                     except: continue
-                
+
                 if not reviews_tab: continue
                 reviews_tab.click()
                 time.sleep(2)
