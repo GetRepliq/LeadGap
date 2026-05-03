@@ -12,14 +12,14 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-from selenium.webdriver.chrome.service import Service
-
 def get_driver():
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--blink-settings=imagesEnabled=false") # Speed up by disabling images
     chrome_options.binary_location = "/usr/bin/chromium"
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
     
@@ -37,9 +37,10 @@ def filter_reviews(reviews, min_word_count=5):
         unique_reviews.append(review)
     return unique_reviews
 
-def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_business=10, min_stars=1, max_stars=5):
+def scrape_all_business_reviews(search_query, max_businesses=3, reviews_per_business=10, min_stars=1, max_stars=5):
     driver = get_driver()
     wait = WebDriverWait(driver, 15)
+    all_reviews_data = []
     
     try:
         search_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}"
@@ -49,35 +50,36 @@ def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_busi
         try:
             consent_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[aria-label='Reject all']")))
             consent_button.click()
+            time.sleep(1)
         except: pass
 
-        # Get listings
-        business_listing_selector = "div[role='article']"
+        # 1. Direct-Hit Optimization: Collect all target URLs first
+        business_listing_selector = "a.hfpxzc"
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, business_listing_selector)))
-        business_listings = driver.find_elements(By.CSS_SELECTOR, business_listing_selector)
-
-        all_reviews_data = []
-
-        for i in range(min(len(business_listings), max_businesses)):
+        
+        listings = driver.find_elements(By.CSS_SELECTOR, "div[role='article']")
+        targets = []
+        for biz in listings[:max_businesses]:
             try:
-                # Re-find to avoid stale elements
-                current_listings = driver.find_elements(By.CSS_SELECTOR, business_listing_selector)
-                if i >= len(current_listings): break
-                
-                biz_article = current_listings[i]
-                biz_name = biz_article.get_attribute("aria-label")
-                
-                link = biz_article.find_element(By.CSS_SELECTOR, "a.hfpxzc")
-                link.click()
-                time.sleep(3)
+                name = biz.get_attribute("aria-label")
+                link = biz.find_element(By.CSS_SELECTOR, "a.hfpxzc").get_attribute("href")
+                if name and link:
+                    targets.append({"name": name, "link": link})
+            except: continue
+
+        # 2. Visit each business directly (skips re-loading search results)
+        for target in targets:
+            try:
+                driver.get(target["link"])
+                time.sleep(2)
 
                 # Find Reviews Tab
-                reviews_tab_selectors = ["//button[@role='tab'][contains(., 'Reviews')]", "button[aria-label*='Reviews']"]
                 reviews_tab = None
-                for selector in reviews_tab_selectors:
+                selectors = ["//button[@role='tab'][contains(., 'Reviews')]", "button[aria-label*='Reviews']"]
+                for s in selectors:
                     try:
-                        by = By.XPATH if selector.startswith('/') else By.CSS_SELECTOR
-                        reviews_tab = wait.until(EC.element_to_be_clickable((by, selector)))
+                        by = By.XPATH if s.startswith('/') else By.CSS_SELECTOR
+                        reviews_tab = wait.until(EC.element_to_be_clickable((by, s)))
                         break
                     except: continue
                 
@@ -85,24 +87,16 @@ def scrape_all_business_reviews(search_query, max_businesses=5, reviews_per_busi
                 reviews_tab.click()
                 time.sleep(2)
 
-                # Scroll and Extract (Simplified for cloud reliability)
-                scrollable_pane = driver.find_element(By.CSS_SELECTOR, "div.m6QErb.DxyBCb.kA9KIf.dS8AEf")
-                for _ in range(3): # Scroll a few times
-                    driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", scrollable_pane)
-                    time.sleep(2)
-
+                # Extract reviews (Limited scroll to respect Render timeout)
                 review_elements = driver.find_elements(By.CSS_SELECTOR, "div.jJc9Ad")
-                for el in review_elements:
+                for el in review_elements[:reviews_per_business]:
                     try:
                         text = el.find_element(By.CSS_SELECTOR, "span.wiI7pd").text
                         star_aria = el.find_element(By.CSS_SELECTOR, "span.kvMYJc").get_attribute("aria-label")
                         stars = float(star_aria.split(" ")[0]) if star_aria else 0
                         if text and min_stars <= stars <= max_stars:
-                            all_reviews_data.append({"business_name": biz_name, "stars": star_aria, "text": text})
+                            all_reviews_data.append({"business_name": target["name"], "stars": star_aria, "text": text})
                     except: continue
-
-                driver.get(search_url)
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, business_listing_selector)))
             except: continue
 
         return filter_reviews(all_reviews_data)
@@ -117,14 +111,12 @@ def scrape_competitor_reviews(competitor_name, location, reviews_per_business=20
         driver.get(f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}")
         time.sleep(4)
 
-        # Handle direct hit vs list
         if "place/" not in driver.current_url:
             try:
                 driver.find_element(By.CSS_SELECTOR, "a.hfpxzc").click()
                 time.sleep(3)
             except: pass
 
-        # Extract Info
         biz_info = {"name": competitor_name, "website": "N/A", "phone": "N/A", "address": "N/A"}
         try:
             h1 = driver.find_element(By.CSS_SELECTOR, "h1").text
@@ -133,13 +125,11 @@ def scrape_competitor_reviews(competitor_name, location, reviews_per_business=20
             if web: biz_info["website"] = web[0].get_attribute("href")
         except: pass
 
-        # Click Reviews
         try:
             driver.find_element(By.XPATH, "//button[@role='tab'][contains(., 'Reviews')]").click()
             time.sleep(2)
         except: return {"business_info": biz_info, "reviews": []}
 
-        # Extract
         all_reviews = []
         review_els = driver.find_elements(By.CSS_SELECTOR, "div.jJc9Ad")
         for el in review_els:
