@@ -44,11 +44,24 @@ const features = [
 export default function Main() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [showLoginToast, setShowLoginToast] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) setUser(session.user);
+      if (session) {
+        setUser(session.user);
+        const hasShown = sessionStorage.getItem("leadgap_auth_toast_shown");
+        if (!hasShown) {
+          setShowLoginToast(true);
+          sessionStorage.setItem("leadgap_auth_toast_shown", "true");
+          setTimeout(() => {
+            setIsExiting(true);
+            setTimeout(() => setShowLoginToast(false), 1000);
+          }, 5000);
+        }
+      }
     };
 
     getSession();
@@ -56,7 +69,19 @@ export default function Main() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const newUser = session?.user ?? null;
+      setUser(newUser);
+      if (newUser) {
+        const hasShown = sessionStorage.getItem("leadgap_auth_toast_shown");
+        if (!hasShown) {
+          setShowLoginToast(true);
+          sessionStorage.setItem("leadgap_auth_toast_shown", "true");
+          setTimeout(() => {
+            setIsExiting(true);
+            setTimeout(() => setShowLoginToast(false), 1000);
+          }, 5000);
+        }
+      }
     });
 
     return () => {
@@ -77,12 +102,17 @@ export default function Main() {
       {/* ─── HERO ─────────────────────────────────────────────────────────── */}
       <div className="relative min-h-screen w-full flex flex-col overflow-hidden">
       
-      {/* Logged in indicator */}
-      {user && (
-        <div className="absolute top-24 left-8 z-50 flex items-center gap-2 px-3 py-1 rounded-full bg-green-900/20 border border-green-500/30">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          <span className="text-green-500 text-[10px] uppercase tracking-wider font-medium">
-            Logged in as {user.user_metadata?.full_name || user.email.split('@')[0]}
+      {/* Logged in indicator (Compact Terminal Style) */}
+      {showLoginToast && user && (
+        <div 
+          className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-4 py-2 bg-[#0a0a0a]/80 backdrop-blur-md border border-white/10 shadow-xl transition-all duration-1000 ease-in-out ${
+            isExiting ? "opacity-0 blur-xl -translate-y-4" : "opacity-100 blur-0 translate-y-0 animate-in fade-in slide-in-from-top-8"
+          }`}
+          style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}
+        >
+          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-white/70 text-[11px] font-medium tracking-tight">
+            AUTH_SESSION: {user.user_metadata?.full_name || user.email.split('@')[0]}
           </span>
         </div>
       )}
