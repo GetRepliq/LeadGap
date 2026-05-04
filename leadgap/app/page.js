@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 const steps = [
   {
@@ -41,6 +43,26 @@ const features = [
 
 export default function Main() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) setUser(session.user);
+    };
+
+    getSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleNavClick = (id) => {
     const el = document.getElementById(id);
@@ -54,6 +76,16 @@ export default function Main() {
 
       {/* ─── HERO ─────────────────────────────────────────────────────────── */}
       <div className="relative min-h-screen w-full flex flex-col overflow-hidden">
+      
+      {/* Logged in indicator */}
+      {user && (
+        <div className="absolute top-24 left-8 z-50 flex items-center gap-2 px-3 py-1 rounded-full bg-green-900/20 border border-green-500/30">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <span className="text-green-500 text-[10px] uppercase tracking-wider font-medium">
+            Logged in as {user.user_metadata?.full_name || user.email.split('@')[0]}
+          </span>
+        </div>
+      )}
 
       <img
         src="/hero.png"
