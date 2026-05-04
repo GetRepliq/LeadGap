@@ -11,6 +11,7 @@ export default function AgentPage() {
   const [logs, setLogs] = useState([]);
   const [startTime, setStartTime] = useState(0); 
   const [duration, setDuration] = useState(0); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // --- Auth & Session State ---
   const [user, setUser] = useState(null);
@@ -210,18 +211,32 @@ export default function AgentPage() {
 
   return (
     <div
-      className="h-screen w-full flex flex-row text-sm overflow-hidden"
+      className="h-screen w-full flex flex-row text-sm overflow-hidden relative"
       style={{
         background: "#0a0a0a",
         color: "rgba(255, 255, 255, 0.7)",
         fontFamily: "var(--font-jetbrains-mono), 'Courier New', monospace",
       }}
     >
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Sidebar ── */}
-      <aside className="w-[240px] border-r border-white/5 flex flex-col bg-[#0a0a0a] flex-shrink-0" style={{ letterSpacing: "-0.025em" }}>
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 w-[240px] border-r border-white/5 flex flex-col bg-[#0a0a0a] transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ letterSpacing: "-0.025em" }}
+      >
         <div className="p-6">
           <button 
-            onClick={startNewChat}
+            onClick={() => {
+              startNewChat();
+              if (window.innerWidth < 768) setIsSidebarOpen(false);
+            }}
             className="w-full border border-white/10 py-2 px-4 text-left hover:bg-white/5 transition-colors opacity-60 hover:opacity-100"
           >
             + New Terminal
@@ -234,7 +249,10 @@ export default function AgentPage() {
             {previousChats.map((chat) => (
               <button
                 key={chat.id}
-                onClick={() => loadChat(chat)}
+                onClick={() => {
+                  loadChat(chat);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
                 className={`w-full text-left px-3 py-2 transition-all group relative ${chatId === chat.id ? "text-blue-400 bg-white/5" : "hover:text-white hover:bg-white/[0.02] opacity-40 hover:opacity-100"}`}
               >
                 <div className="truncate pr-4 text-[12px]">
@@ -258,21 +276,33 @@ export default function AgentPage() {
 
       {/* ── Main Content Area ── */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="flex-1 flex flex-col mx-auto w-full max-w-[800px] px-6 pt-8 overflow-hidden">
+        {/* Sidebar Toggle Button */}
+        <button 
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="absolute top-6 left-6 z-30 p-2 border border-white/10 hover:bg-white/5 transition-all duration-300 opacity-60 hover:opacity-100 md:hidden"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+
+        <div className="flex-1 flex flex-col mx-auto w-full max-w-[800px] px-6 pt-20 md:pt-8 overflow-hidden">
           
           {/* ── Header ── */}
-          <div className={`flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out ${responses.length === 0 && !loading ? 'mt-[15vh] mb-12' : 'mb-6 scale-90 origin-top'}`}>
+          <div className={`flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out ${responses.length === 0 && !loading ? 'mt-[10vh] md:mt-[15vh] mb-12' : 'mb-6 scale-90 origin-top'}`}>
             <div className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'mb-8' : 'mb-4'}`}>
               <img 
                 src="/glass-logo.png" 
                 alt="LeadGap Logo" 
-                className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'w-[100px] h-[100px]' : 'w-[65px] h-[65px]'}`}
+                className={`transition-all duration-700 ${responses.length === 0 && !loading ? 'w-[80px] h-[80px] md:w-[100px] md:h-[100px]' : 'w-[50px] h-[50px] md:w-[65px] md:h-[65px]'}`}
               />
             </div>
-            <h1 className={`${responses.length === 0 && !loading ? 'text-2xl' : 'text-xl'} text-white font-semibold transition-all tracking-tighter duration-700`}>
+            <h1 className={`${responses.length === 0 && !loading ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'} text-white font-semibold transition-all tracking-tighter duration-700`}>
               Terminal v2.0.1
             </h1>
-            <p className={`max-w-[480px] opacity-70 font-medium tracking-tight transition-all duration-700 ${responses.length === 0 && !loading ? 'text-sm' : 'text-xs'}`}>
+            <p className={`max-w-[480px] opacity-70 font-medium tracking-tight transition-all duration-700 ${responses.length === 0 && !loading ? 'text-xs md:text-sm' : 'text-[10px] md:text-xs'}`}>
               Autonomous intelligence agent ready for command.
             </p>
           </div>
@@ -326,7 +356,7 @@ export default function AgentPage() {
                         <h3 className="text-white font-medium underline underline-offset-8 decoration-white/20 mb-6 uppercase tracking-wider text-xs">
                           Competitor Analysis Report: {response.card.competitor_name}
                         </h3>
-                        <div className="grid grid-cols-2 gap-8 opacity-80">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-80">
                           <div><p className="text-white/40 mb-1">Market Position</p><p>{response.card.market_position}</p></div>
                           <div><p className="text-white/40 mb-1">Frustration Level</p><p>{response.card.customer_frustration_level}</p></div>
                         </div>
@@ -387,7 +417,7 @@ export default function AgentPage() {
         </div>
 
         {/* ── Input Bar ── */}
-        <div className="w-full max-w-[800px] mx-auto px-6 pb-12 flex-shrink-0">
+        <div className="w-full max-w-[800px] mx-auto px-6 pb-6 md:pb-12 flex-shrink-0">
           <div className="flex items-center gap-3 w-full px-4 py-2 bg-transparent border border-white/20">
             <span className="opacity-60 text-sm">→</span>
             <input
@@ -400,8 +430,8 @@ export default function AgentPage() {
               disabled={loading}
             />
           </div>
-          <p className="mt-3 opacity-30 text-[13px]">
-            &gt; Engine: Gemini-3-flash | Context Memory: 15% used | Status: {loading ? "Processing..." : "Optimized"}
+          <p className="mt-3 opacity-30 text-[11px] md:text-[13px]">
+            &gt; Engine: Gemini-3-flash | Status: {loading ? "Processing..." : "Optimized"}
           </p>
         </div>
       </div>
