@@ -1,15 +1,20 @@
 import { getAgentJob } from "../../../../lib/agent-job-service";
+import { getCorsHeaders, withCorsJson } from "../../../../lib/api-cors";
 
-export async function GET(_request, { params }) {
+export async function OPTIONS(request) {
+  return new Response(null, {
+    status: 204,
+    headers: getCorsHeaders(request),
+  });
+}
+
+export async function GET(request, { params }) {
   try {
     const { jobId } = params;
     const job = await getAgentJob(jobId);
 
-    return new Response(JSON.stringify(job), { status: 200 });
+    return withCorsJson(request, job, 200);
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message || "Job lookup failed" }),
-      { status: 404 }
-    );
+    return withCorsJson(request, { error: error.message || "Job lookup failed" }, 404);
   }
 }
