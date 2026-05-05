@@ -22,7 +22,7 @@ ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROME_PATH=/usr/lib/chromium/
 ENV PYTHONUNBUFFERED=1
 # Niche scrape stops early so the HTTP response returns before upstream (e.g. Vercel) aborts
-ENV SCRAPE_BUDGET_SEC=78
+ENV SCRAPE_BUDGET_SEC=2340
 
 # Expose port
 EXPOSE 8000
