@@ -174,6 +174,11 @@ export default function AgentPage() {
   const handleSubmit = async () => {
     if (!input.trim() || loading) return;
 
+    if (!user?.id) {
+      setResponses(prev => [...prev, { error: "You must be logged in before running analysis.", query: input }]);
+      return;
+    }
+
     const currentInput = input;
     setInput(""); 
     setLoading(true);
@@ -196,8 +201,8 @@ export default function AgentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: currentInput,
-          userId: user?.id, 
-          chatId: chatId,   
+          userId: user.id ?? null,
+          chatId: chatId ?? null,
           history: historyPayload
         }),
       });

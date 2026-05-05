@@ -22,7 +22,11 @@ export async function OPTIONS(request) {
 
 export async function POST(request) {
   const body = await request.json();
-  const { message, userId, chatId, history = [], action, apiKey } = body;
+  const { message, history = [], action, apiKey } = body;
+
+  // Normalize IDs: treat undefined, null, or the string "undefined" as null
+  const userId = (body.userId === undefined || body.userId === null || body.userId === "undefined") ? null : body.userId;
+  const chatId = (body.chatId === undefined || body.chatId === null || body.chatId === "undefined") ? null : body.chatId;
 
   // --- Action: Save/Encrypt API Key ---
   if (action === 'save_key' && userId && apiKey) {
