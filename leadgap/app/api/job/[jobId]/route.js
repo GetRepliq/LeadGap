@@ -9,10 +9,15 @@ export async function OPTIONS(request) {
 }
 
 export async function GET(request, { params }) {
-  try {
-    const { jobId } = params;
-    const job = await getAgentJob(jobId);
+  const { jobId } = params ?? {};
+  console.info(`[job] GET ${new URL(request.url).pathname} — jobId: ${jobId}`);
 
+  if (!jobId) {
+    return withCorsJson(request, { error: "Missing jobId" }, 400);
+  }
+
+  try {
+    const job = await getAgentJob(jobId);
     return withCorsJson(request, job, 200);
   } catch (error) {
     return withCorsJson(request, { error: error.message || "Job lookup failed" }, 404);
