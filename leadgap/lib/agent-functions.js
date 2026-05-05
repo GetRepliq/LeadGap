@@ -218,7 +218,7 @@ export function formatGeneratedContent(text) {
 }
 
 export async function saveChat({ userId, chatId, title, messages }) {
-  if (!userId) return null;
+  if (!userId || userId === "undefined") return null;
   const payload = { messages, updated_at: new Date().toISOString() };
   if (title) payload.title = title;
 
