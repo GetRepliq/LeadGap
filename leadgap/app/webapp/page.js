@@ -8,6 +8,38 @@ export default function AgentPage() {
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_AGENT_API_BASE_URL?.replace(/\/$/, "") || "";
   const buildApiUrl = (path) => `${API_BASE_URL}${path}`;
+  const parseJsonResponse = async (response, contextLabel = "Request") => {
+    const contentType = response.headers.get("content-type") || "";
+    const rawBody = await response.text();
+
+    if (!rawBody) {
+      if (!response.ok) {
+        throw new Error(`${contextLabel} failed (${response.status}) with empty response.`);
+      }
+      return {};
+    }
+
+    const looksJson =
+      contentType.includes("application/json") ||
+      rawBody.trim().startsWith("{") ||
+      rawBody.trim().startsWith("[");
+
+    if (!looksJson) {
+      const snippet = rawBody.replace(/\s+/g, " ").slice(0, 180);
+      throw new Error(
+        `${contextLabel} returned non-JSON (${response.status}). Body: ${snippet}`
+      );
+    }
+
+    try {
+      return JSON.parse(rawBody);
+    } catch {
+      const snippet = rawBody.replace(/\s+/g, " ").slice(0, 180);
+      throw new Error(
+        `${contextLabel} returned invalid JSON (${response.status}). Body: ${snippet}`
+      );
+    }
+  };
 
   const [input, setInput] = useState("");
   const [responses, setResponses] = useState([]); 
@@ -67,7 +99,7 @@ export default function AgentPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response, "Save key request");
       if (data.success) {
         setShowKeyModal(false);
       } else {
@@ -123,8 +155,10 @@ export default function AgentPage() {
 
     while (Date.now() - startedAt < timeoutMs) {
       const res = await fetch(buildApiUrl(`/api/job/${jobId}`));
-      if (!res.ok) throw new Error("Failed to read async job status.");
-      const job = await res.json();
+      const job = await parseJsonResponse(res, "Job status request");
+      if (!res.ok) {
+        throw new Error(job.error || `Failed to read async job status (${res.status}).`);
+      }
 
       if (job.status === "done") return job.result;
       if (job.status === "failed") {
@@ -168,7 +202,10 @@ export default function AgentPage() {
         }),
       });
 
-      let data = await apiResponse.json();
+      let data = await parseJsonResponse(apiResponse, "Agent request");
+      if (!apiResponse.ok && apiResponse.status !== 202) {
+        throw new Error(data.error || `Agent request failed (${apiResponse.status}).`);
+      }
       const endTime = Date.now();
 
       if (apiResponse.status === 202 && data?.jobId) {
