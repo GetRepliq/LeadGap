@@ -5,7 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_PRIVATE_SERVICE_ROLE;
-const SCRAPER_URL = "https://leadgap-ybbg.onrender.com/scrape";
+const SCRAPER_URL =
+  process.env.SCRAPER_URL || "https://leadgap-ybbg.onrender.com/scrape";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

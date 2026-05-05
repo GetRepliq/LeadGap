@@ -5,6 +5,10 @@ import { supabase } from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
 export default function AgentPage() {
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_AGENT_API_BASE_URL?.replace(/\/$/, "") || "";
+  const buildApiUrl = (path) => `${API_BASE_URL}${path}`;
+
   const [input, setInput] = useState("");
   const [responses, setResponses] = useState([]); 
   const [loading, setLoading] = useState(false);
@@ -53,7 +57,7 @@ export default function AgentPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/agent', {
+      const response = await fetch(buildApiUrl('/api/agent'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -118,7 +122,7 @@ export default function AgentPage() {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < timeoutMs) {
-      const res = await fetch(`/api/job/${jobId}`);
+      const res = await fetch(buildApiUrl(`/api/job/${jobId}`));
       if (!res.ok) throw new Error("Failed to read async job status.");
       const job = await res.json();
 
@@ -153,7 +157,7 @@ export default function AgentPage() {
         { role: 'agent', content: r }
       ])).flat();
 
-      const apiResponse = await fetch('/api/agent', {
+      const apiResponse = await fetch(buildApiUrl('/api/agent'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
