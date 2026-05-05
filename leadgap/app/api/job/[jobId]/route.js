@@ -8,15 +8,16 @@ export async function OPTIONS(request) {
   });
 }
 
-export async function GET(request, { params }) {
-  const { jobId } = params ?? {};
-  console.info(`[job] GET ${new URL(request.url).pathname} — jobId: ${jobId}`);
-
-  if (!jobId) {
-    return withCorsJson(request, { error: "Missing jobId" }, 400);
-  }
-
+export async function GET(request, { params } = {}) {
   try {
+    const jobIdFromParams = params?.jobId;
+    const jobIdFromUrl = new URL(request.url).pathname.split("/").pop();
+    const jobId = jobIdFromParams || jobIdFromUrl;
+
+    if (!jobId || jobId === "undefined") {
+      return withCorsJson(request, { error: "Missing jobId" }, 400);
+    }
+
     const job = await getAgentJob(jobId);
     return withCorsJson(request, job, 200);
   } catch (error) {
