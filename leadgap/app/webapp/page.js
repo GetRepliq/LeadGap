@@ -114,6 +114,25 @@ export default function AgentPage() {
     setInput("");
   };
 
+  const pollJobUntilComplete = async (jobId, timeoutMs = 180000) => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const res = await fetch(`/api/job/${jobId}`);
+      if (!res.ok) throw new Error("Failed to read async job status.");
+      const job = await res.json();
+
+      if (job.status === "done") return job.result;
+      if (job.status === "failed") {
+        throw new Error(job.error_message || "Async job failed.");
+      }
+
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+
+    throw new Error("Async job timeout. Please retry.");
+  };
+
   const handleSubmit = async () => {
     if (!input.trim() || loading) return;
 
@@ -145,8 +164,17 @@ export default function AgentPage() {
         }),
       });
 
-      const data = await apiResponse.json();
+      let data = await apiResponse.json();
       const endTime = Date.now();
+
+      if (apiResponse.status === 202 && data?.jobId) {
+        setLogs((prev) => [
+          ...prev,
+          { text: `Queued job ${data.jobId.slice(0, 8)}...`, type: "step" },
+          { text: "Background worker processing scrape...", type: "step" },
+        ]);
+        data = await pollJobUntilComplete(data.jobId);
+      }
 
       if (data.chatId) {
         setChatId(data.chatId);
