@@ -298,7 +298,7 @@ def scrape_all_business_reviews(
                 eprint("[scraper] business loop error:", target.get("name"), ex)
                 continue
 
-        out = filter_reviews(all_reviews_data)
+        out = filter_reviews(all_reviews_data)[:20]  # hard cap: at most 20 reviews per scrape job
         eprint("[scraper] niche complete, review count:", len(out))
         return out
     finally:
@@ -361,6 +361,6 @@ def scrape_competitor_reviews(
         xs = float(max_stars)
         rows = extract_review_blocks(driver, reviews_per_business, biz_info["name"], ms, xs)
 
-        return {"business_info": biz_info, "reviews": filter_reviews(rows)}
+        return {"business_info": biz_info, "reviews": filter_reviews(rows)[:20]}  # hard cap: at most 20 reviews per scrape job
     finally:
         driver.quit()

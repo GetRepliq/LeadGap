@@ -234,14 +234,14 @@ export async function scrapeReviews({ searchQuery, mode = "niche", competitorNam
     query: searchQuery || competitorName, // Ensure we have a query
     mode,
     location,
-    // Keep niche scrape bounded so Vercel’s route + Render finish under typical limits
+    // Keep niche scrape bounded; total reviews capped at 20 across all businesses
     max_businesses: 2,
-    reviews_per_business: mode === "competitor" ? 15 : 8,
+    reviews_per_business: mode === "competitor" ? 20 : 10,
   };
 
   console.log("[agent] Sending payload to Render:", JSON.stringify(payload));
 
-  const scraperMs = Number(process.env.SCRAPER_FETCH_TIMEOUT_MS) || 118000;
+  const scraperMs = Number(process.env.SCRAPER_FETCH_TIMEOUT_MS) || 2400000;
 
   try {
     const response = await fetch(SCRAPER_URL, {
