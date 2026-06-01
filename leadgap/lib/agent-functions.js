@@ -1,12 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from '@supabase/supabase-js';
+import { scrapeNicheReviews, scrapeCompetitorReviews } from "./google-scraper";
 
 // --- Configuration ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_PRIVATE_SERVICE_ROLE;
-const SCRAPER_URL =
-  process.env.SCRAPER_URL || "https://leadgap-ybbg.onrender.com/scrape";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -230,43 +229,25 @@ export async function saveChat({ userId, chatId, title, messages }) {
 }
 
 export async function scrapeReviews({ searchQuery, mode = "niche", competitorName, location }) {
-  const payload = {
-    query: searchQuery || competitorName, // Ensure we have a query
-    mode,
-    location,
-    // Keep niche scrape bounded so Vercel’s route + Render finish under typical limits
-    max_businesses: 2,
-    reviews_per_business: mode === "competitor" ? 15 : 8,
-  };
-
-  console.log("[agent] Sending payload to Render:", JSON.stringify(payload));
-
-  const scraperMs = Number(process.env.SCRAPER_FETCH_TIMEOUT_MS) || 118000;
+  console.log(`[agent] Starting local scrape: mode=${mode}, query=${searchQuery || competitorName}, location=${location}`);
 
   try {
-    const response = await fetch(SCRAPER_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(scraperMs),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text(); // Get raw text if JSON parse fails
-      console.error("[agent] Render returned error status:", response.status, "Body:", errBody);
-      throw new Error(`Scraper failed (${response.status}): ${errBody}`);
+    if (mode === "competitor") {
+      return await scrapeCompetitorReviews({
+        competitorName: competitorName || searchQuery,
+        location: location || "unknown location",
+        reviews_per_business: 15
+      });
+    } else {
+      return await scrapeNicheReviews({
+        searchQuery,
+        location,
+        max_businesses: 2,
+        reviews_per_business: 8
+      });
     }
-
-    return await response.json();
   } catch (e) {
-    const aborted =
-      e?.name === "AbortError" ||
-      e?.name === "TimeoutError" ||
-      /aborted|timeout/i.test(String(e?.message));
-    const msg = aborted
-      ? `Scraper request timed out after ${scraperMs}ms (increase SCRAPER_FETCH_TIMEOUT_MS or Vercel maxDuration)`
-      : e.message;
-    console.error("[agent] Fetch error during scraping:", msg);
-    return { error: msg };
+    console.error("[agent] Local scraper error:", e.message);
+    return { error: e.message };
   }
 }
