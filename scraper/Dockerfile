@@ -21,7 +21,7 @@ ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV PYTHONUNBUFFERED=1
 # Finish before upstream worker/proxy limits; niche scrape is capped at 1 business.
-ENV SCRAPE_BUDGET_SEC=90
+ENV SCRAPE_BUDGET_SEC=120
 ENV PAGE_LOAD_TIMEOUT_SEC=25
 ENV SCRIPT_TIMEOUT_SEC=20
 

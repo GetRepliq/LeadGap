@@ -92,6 +92,11 @@ export async function runAgentPipeline({
 
       if (scrapedNicheReviews.error) {
         agentResponse = { error: `Scraping error: ${scrapedNicheReviews.error}` };
+      } else if (!Array.isArray(scrapedNicheReviews) || scrapedNicheReviews.length === 0) {
+        agentResponse = {
+          error:
+            "Scraper returned no reviews. Google Maps may be blocking the server IP or the page layout changed.",
+        };
       } else {
         agentResponse = await analyzeReviews(scrapedNicheReviews, activeApiKey);
         if (agentResponse && agentResponse.rawJson) {

@@ -33,14 +33,18 @@ def _chrome_options() -> Options:
     chrome_bin = os.environ.get("CHROME_BIN") or shutil.which("chromium") or "/usr/bin/chromium"
     chrome_options = Options()
     chrome_options.binary_location = chrome_bin
-    chrome_options.page_load_strategy = "eager"
+    chrome_options.page_load_strategy = "normal"
+    chrome_options.add_experimental_option(
+        "prefs", {"intl.accept_languages": "en,en_US"}
+    )
     for arg in (
         "--headless=new",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
-        "--window-size=1280,720",
+        "--window-size=1920,1080",
+        "--lang=en-US",
         "--disable-extensions",
         "--blink-settings=imagesEnabled=false",
         "--disable-background-networking",
@@ -87,7 +91,7 @@ def get_driver():
     raise WebDriverException(f"Chrome could not start: {last_error}")
 
 
-def filter_reviews(reviews: List[dict], min_word_count: int = 5) -> List[dict]:
+def filter_reviews(reviews: List[dict], min_word_count: int = 3) -> List[dict]:
     unique_reviews = []
     seen_texts = set()
     for review in reviews:
@@ -148,6 +152,52 @@ def _listing_link_selectors():
     ]
 
 
+def _page_block_reason(driver) -> Optional[str]:
+    try:
+        src = (driver.page_source or "").lower()
+        title = (driver.title or "").lower()
+    except Exception:
+        return None
+    if "unusual traffic" in src or "captcha" in src or "/sorry/" in driver.current_url:
+        return "google_captcha"
+    if "before you continue" in src or "consent.google" in driver.current_url:
+        return "google_consent_wall"
+    if title in ("google maps", "") and "role=\"feed\"" not in src and "/maps/place/" not in driver.current_url:
+        return "maps_not_loaded"
+    return None
+
+
+def _parse_star_value(star_aria: str) -> Optional[float]:
+    if not star_aria:
+        return None
+    for token in star_aria.replace(",", ".").split():
+        try:
+            return float(token)
+        except ValueError:
+            continue
+    return None
+
+
+def scroll_reviews_panel(driver, rounds: int = 5) -> None:
+    selectors = (
+        "div[role='main'] div.m6QErb.DxyBCb",
+        "div[role='main'] div.m6QErb",
+        "div[role='main']",
+    )
+    for css in selectors:
+        try:
+            panel = driver.find_element(By.CSS_SELECTOR, css)
+            for _ in range(rounds):
+                driver.execute_script(
+                    "arguments[0].scrollTop = arguments[0].scrollHeight",
+                    panel,
+                )
+                time.sleep(0.35)
+            return
+        except Exception:
+            continue
+
+
 def collect_place_targets(driver, max_businesses: int) -> List[Dict[str, str]]:
     targets: List[Dict[str, str]] = []
     seen_urls = set()
@@ -192,19 +242,20 @@ def collect_place_targets(driver, max_businesses: int) -> List[Dict[str, str]]:
     return targets[:max_businesses]
 
 
-def open_reviews_tab(driver, timeout: float = 5.0) -> bool:
-    # One combined wait — old code tried up to 3×8s (~24s) per place.
+def open_reviews_tab(driver, timeout: float = 8.0) -> bool:
     xpath = (
         "//button[@role='tab'][contains(., 'Reviews')] | "
         "//div[@role='tab'][contains(., 'Reviews')] | "
-        "//button[contains(@aria-label, 'Reviews')]"
+        "//button[contains(@aria-label, 'Reviews')] | "
+        "//button[contains(@aria-label, 'reviews')]"
     )
     try:
         tab = WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable((By.XPATH, xpath))
         )
         tab.click()
-        time.sleep(0.65)
+        time.sleep(1.0)
+        scroll_reviews_panel(driver)
         return True
     except Exception:
         return False
@@ -212,36 +263,84 @@ def open_reviews_tab(driver, timeout: float = 5.0) -> bool:
 
 def extract_review_blocks(driver, reviews_per_business: int, target_name: str, min_stars: float, max_stars: float) -> List[dict]:
     rows: List[dict] = []
-    review_elements = driver.find_elements(By.CSS_SELECTOR, "div.jJc9Ad")
-    if not review_elements:
-        review_elements = driver.find_elements(By.CSS_SELECTOR, "[data-review-id]")
-    for el in review_elements[: reviews_per_business * 2]:
+    review_elements: List[Any] = []
+    for css in ("div.jftiEf", "div.jJc9Ad", "[data-review-id]"):
+        review_elements = driver.find_elements(By.CSS_SELECTOR, css)
+        if review_elements:
+            eprint(f"[scraper] review blocks via {css}: {len(review_elements)}")
+            break
+
+    text_selectors = (
+        "span.wiI7pd",
+        "div.wiI7pd",
+        "div.MyEned span",
+        "span[class*='wiI7pd']",
+    )
+    star_selectors = ("span.kvMYJc", "span[role='img'][aria-label*='star']", "[aria-label*='stars']")
+
+    for el in review_elements[: reviews_per_business * 3]:
         if len(rows) >= reviews_per_business:
             break
         try:
             text = ""
-            for span_sel in ("span.wiI7pd", "span[class*='review']"):
+            for span_sel in text_selectors:
                 try:
                     text = el.find_element(By.CSS_SELECTOR, span_sel).text.strip()
                     if text:
                         break
                 except Exception:
                     continue
-            stars = 0.0
+            if not text:
+                continue
+
+            stars: Optional[float] = None
             star_aria = ""
-            for star_sel in ("span.kvMYJc", "[aria-label*='star']"):
+            for star_sel in star_selectors:
                 try:
                     star_aria = el.find_element(By.CSS_SELECTOR, star_sel).get_attribute("aria-label") or ""
                     if star_aria:
-                        stars = float(star_aria.split()[0])
-                        break
+                        stars = _parse_star_value(star_aria)
+                        if stars is not None:
+                            break
                 except Exception:
                     continue
-            if text and min_stars <= stars <= max_stars:
+
+            if stars is None:
+                rows.append({"business_name": target_name, "stars": star_aria or "unknown", "text": text})
+            elif min_stars <= stars <= max_stars:
                 rows.append({"business_name": target_name, "stars": star_aria, "text": text})
         except Exception:
             continue
     return rows
+
+
+def probe_maps_search(search_query: str, location: Optional[str] = None) -> Dict[str, Any]:
+    """Lightweight probe for debugging empty scrapes (no review extraction)."""
+    driver = get_driver()
+    try:
+        url = _maps_search_url(search_query, location)
+        driver.get(url)
+        dismiss_cookie_consent(driver)
+        time.sleep(2.0)
+
+        blocked = _page_block_reason(driver)
+        feed_count = len(driver.find_elements(By.CSS_SELECTOR, "div[role='feed']"))
+        article_count = len(driver.find_elements(By.CSS_SELECTOR, "div[role='article']"))
+        place_links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/maps/place/']")
+        targets = collect_place_targets(driver, 3)
+
+        return {
+            "url": url,
+            "current_url": driver.current_url,
+            "title": driver.title,
+            "blocked": blocked,
+            "feed_count": feed_count,
+            "article_count": article_count,
+            "place_link_count": len(place_links),
+            "targets": targets,
+        }
+    finally:
+        driver.quit()
 
 
 def scrape_all_business_reviews(
@@ -262,27 +361,46 @@ def scrape_all_business_reviews(
         driver.get(url)
 
         dismiss_cookie_consent(driver)
+        time.sleep(1.0)
 
-        loaded = False
-        for css in ("div[role='feed']", "div[role='article']"):
-            if _over_budget(deadline):
-                eprint("[scraper] budget hit while waiting for results")
-                return filter_reviews(all_reviews_data)
-            try:
-                WebDriverWait(driver, 12).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, css))
-                )
-                loaded = True
-                break
-            except TimeoutException:
-                continue
-        if not loaded:
-            eprint("[scraper] timeout waiting for results feed/articles")
+        blocked = _page_block_reason(driver)
+        if blocked:
+            eprint("[scraper] maps blocked:", blocked, "url:", driver.current_url)
             return []
 
-        time.sleep(0.45)
-        targets = collect_place_targets(driver, max_businesses)
-        eprint("[scraper] targets collected:", len(targets), json.dumps([t["name"] for t in targets]))
+        # Search sometimes redirects straight to a single place page.
+        if "/maps/place/" in driver.current_url:
+            name = driver.current_url
+            try:
+                h1 = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
+                if h1:
+                    name = h1
+            except Exception:
+                pass
+            targets = [{"name": name, "link": driver.current_url}]
+            eprint("[scraper] direct place URL:", name)
+        else:
+            loaded = False
+            for css in ("div[role='feed']", "div[role='article']"):
+                if _over_budget(deadline):
+                    eprint("[scraper] budget hit while waiting for results")
+                    return filter_reviews(all_reviews_data)
+                try:
+                    WebDriverWait(driver, 15).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, css))
+                    )
+                    loaded = True
+                    break
+                except TimeoutException:
+                    continue
+            if not loaded:
+                reason = _page_block_reason(driver) or "results_feed_timeout"
+                eprint("[scraper] timeout waiting for results feed/articles:", reason)
+                return []
+
+            time.sleep(0.8)
+            targets = collect_place_targets(driver, max_businesses)
+            eprint("[scraper] targets collected:", len(targets), json.dumps([t["name"] for t in targets]))
 
         if not targets:
             eprint("[scraper] no listing URLs found (selectors/DOM mismatch or blocking)")
@@ -296,15 +414,17 @@ def scrape_all_business_reviews(
                 eprint("[scraper] budget exhausted — returning partial niche results")
                 break
             try:
-                driver.get(target["link"])
-                time.sleep(0.9)
-                if not open_reviews_tab(driver, timeout=5.0):
+                if driver.current_url != target["link"]:
+                    driver.get(target["link"])
+                    time.sleep(1.2)
+                if not open_reviews_tab(driver, timeout=8.0):
                     eprint("[scraper] reviews tab not found for:", target["name"])
                     continue
-                time.sleep(0.45)
+                time.sleep(0.8)
                 rows = extract_review_blocks(
                     driver, reviews_per_business, target["name"], ms, xs
                 )
+                eprint("[scraper] extracted rows for", target["name"], ":", len(rows))
                 all_reviews_data.extend(rows)
             except Exception as ex:
                 eprint("[scraper] business loop error:", target.get("name"), ex)

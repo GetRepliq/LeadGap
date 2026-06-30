@@ -6,7 +6,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Union, List, Any, Dict
 
-from scraper_engine import scrape_all_business_reviews, scrape_competitor_reviews, get_driver
+from scraper_engine import (
+    scrape_all_business_reviews,
+    scrape_competitor_reviews,
+    get_driver,
+    probe_maps_search,
+)
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("leadgap.scraper")
@@ -47,6 +52,20 @@ def diagnostics():
     finally:
         if driver:
             driver.quit()
+
+
+@app.post("/probe")
+async def run_probe(request: ScrapeRequest):
+    """Debug Maps search without extracting reviews."""
+    try:
+        return await asyncio.to_thread(
+            probe_maps_search,
+            request.query,
+            request.location,
+        )
+    except Exception as e:
+        log.error("probe failed: %s\n%s", e, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/scrape")
