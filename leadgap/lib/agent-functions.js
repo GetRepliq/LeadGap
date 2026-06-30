@@ -231,17 +231,17 @@ export async function saveChat({ userId, chatId, title, messages }) {
 
 export async function scrapeReviews({ searchQuery, mode = "niche", competitorName, location }) {
   const payload = {
-    query: searchQuery || competitorName, // Ensure we have a query
+    query: searchQuery || competitorName,
     mode,
     location,
-    // Keep niche scrape bounded; total reviews capped at 20 across all businesses
-    max_businesses: 2,
-    reviews_per_business: mode === "competitor" ? 20 : 10,
+    // Keep scrapes short so Render Chromium stays within memory/time limits.
+    max_businesses: 1,
+    reviews_per_business: mode === "competitor" ? 10 : 5,
   };
 
   console.log("[agent] Sending payload to Render:", JSON.stringify(payload));
 
-  const scraperMs = Number(process.env.SCRAPER_FETCH_TIMEOUT_MS) || 2400000;
+  const scraperMs = Number(process.env.SCRAPER_FETCH_TIMEOUT_MS) || 120000;
 
   try {
     const response = await fetch(SCRAPER_URL, {
@@ -251,13 +251,20 @@ export async function scrapeReviews({ searchQuery, mode = "niche", competitorNam
       signal: AbortSignal.timeout(scraperMs),
     });
 
+    const rawBody = await response.text();
     if (!response.ok) {
-      const errBody = await response.text(); // Get raw text if JSON parse fails
-      console.error("[agent] Render returned error status:", response.status, "Body:", errBody);
-      throw new Error(`Scraper failed (${response.status}): ${errBody}`);
+      let detail = rawBody;
+      try {
+        const parsed = JSON.parse(rawBody);
+        detail = parsed.detail || parsed.error || rawBody;
+      } catch {
+        // keep raw text
+      }
+      console.error("[agent] Render returned error status:", response.status, "Body:", detail);
+      throw new Error(`Scraper failed (${response.status}): ${detail}`);
     }
 
-    return await response.json();
+    return rawBody ? JSON.parse(rawBody) : [];
   } catch (e) {
     const aborted =
       e?.name === "AbortError" ||

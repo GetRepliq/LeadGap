@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Union, List, Any, Dict
 
-from scraper_engine import scrape_all_business_reviews, scrape_competitor_reviews
+from scraper_engine import scrape_all_business_reviews, scrape_competitor_reviews, get_driver
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("leadgap.scraper")
@@ -27,6 +27,26 @@ class ScrapeRequest(BaseModel):
 @app.get("/")
 def health_check():
     return {"status": "alive", "service": "LeadGap Scraper Engine"}
+
+
+@app.get("/diagnostics")
+def diagnostics():
+    """Quick Chrome/Chromium smoke test — use after deploy to verify Selenium works."""
+    driver = None
+    try:
+        driver = get_driver()
+        driver.get("about:blank")
+        return {
+            "ok": True,
+            "title": driver.title,
+            "chrome_bin": driver.capabilities.get("browserName"),
+        }
+    except Exception as e:
+        log.error("diagnostics failed: %s\n%s", e, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if driver:
+            driver.quit()
 
 
 @app.post("/scrape")

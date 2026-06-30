@@ -29,47 +29,62 @@ def _over_budget(deadline: float) -> bool:
     return time.monotonic() > deadline
 
 
-def get_driver():
-    chrome_bin = shutil.which("chromium") or "/usr/bin/chromium"
-    driver_bin = shutil.which("chromedriver") or "/usr/bin/chromedriver"
-
+def _chrome_options() -> Options:
+    chrome_bin = os.environ.get("CHROME_BIN") or shutil.which("chromium") or "/usr/bin/chromium"
     chrome_options = Options()
     chrome_options.binary_location = chrome_bin
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-plugins")
-    chrome_options.add_argument("--blink-settings=imagesEnabled=false")
-    chrome_options.add_argument("--disable-background-networking")
-    chrome_options.add_argument("--disable-default-apps")
-    chrome_options.add_argument("--disable-sync")
-    chrome_options.add_argument("--disable-translate")
-    chrome_options.add_argument("--hide-scrollbars")
-    chrome_options.add_argument("--mute-audio")
-    chrome_options.add_argument("--no-first-run")
-    chrome_options.add_argument("--disable-background-timer-throttling")
-    chrome_options.add_argument("--disable-renderer-backgrounding")
-    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-    chrome_options.add_argument("--disable-client-side-phishing-detection")
-    chrome_options.add_argument("--disable-component-extensions-with-background-pages")
-    chrome_options.add_argument("--aggressive-cache-discard")
-    chrome_options.add_argument("--memory-pressure-off")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_argument(
+    chrome_options.page_load_strategy = "eager"
+    for arg in (
+        "--headless=new",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--window-size=1280,720",
+        "--disable-extensions",
+        "--blink-settings=imagesEnabled=false",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--disable-sync",
+        "--disable-translate",
+        "--hide-scrollbars",
+        "--mute-audio",
+        "--no-first-run",
+        "--disable-software-rasterizer",
+        "--disable-blink-features=AutomationControlled",
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    )
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    ):
+        chrome_options.add_argument(arg)
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    return chrome_options
 
-    service = Service(executable_path=driver_bin)
-    try:
-        return webdriver.Chrome(service=service, options=chrome_options)
-    except WebDriverException as e:
-        eprint("[scraper] Chrome startup failed:", e)
-        raise
+
+def get_driver():
+    chrome_options = _chrome_options()
+    driver_bin = os.environ.get("CHROMEDRIVER_PATH") or shutil.which("chromedriver") or "/usr/bin/chromedriver"
+
+    attempts = []
+    if os.path.isfile(driver_bin):
+        attempts.append(("system-chromedriver", Service(executable_path=driver_bin)))
+
+    # Selenium Manager can download a driver matched to the Chromium binary.
+    attempts.append(("selenium-manager", Service()))
+
+    last_error = None
+    for label, service in attempts:
+        try:
+            eprint(f"[scraper] starting Chrome via {label} (driver={getattr(service, 'path', driver_bin)})")
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            driver.set_page_load_timeout(int(os.environ.get("PAGE_LOAD_TIMEOUT_SEC", "25")))
+            driver.set_script_timeout(int(os.environ.get("SCRIPT_TIMEOUT_SEC", "20")))
+            return driver
+        except WebDriverException as e:
+            last_error = e
+            eprint(f"[scraper] Chrome startup failed ({label}):", e)
+            continue
+
+    raise WebDriverException(f"Chrome could not start: {last_error}")
 
 
 def filter_reviews(reviews: List[dict], min_word_count: int = 5) -> List[dict]:
@@ -242,9 +257,6 @@ def scrape_all_business_reviews(
     deadline = _scrape_budget_deadline()
 
     try:
-        driver.set_page_load_timeout(int(os.environ.get("PAGE_LOAD_TIMEOUT_SEC", "32")))
-        driver.set_script_timeout(int(os.environ.get("SCRIPT_TIMEOUT_SEC", "25")))
-
         url = _maps_search_url(search_query, location)
         eprint("[scraper] niche maps URL:", url)
         driver.get(url)
@@ -315,9 +327,6 @@ def scrape_competitor_reviews(
     driver = get_driver()
     deadline = _scrape_budget_deadline()
     try:
-        driver.set_page_load_timeout(int(os.environ.get("PAGE_LOAD_TIMEOUT_SEC", "32")))
-        driver.set_script_timeout(int(os.environ.get("SCRIPT_TIMEOUT_SEC", "25")))
-
         search_query = f"{competitor_name} {location}".strip()
         url = _maps_search_url(search_query, None)
         eprint("[scraper] competitor maps URL:", url)

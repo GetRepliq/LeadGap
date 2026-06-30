@@ -200,18 +200,24 @@ export async function processNextQueuedJob() {
 
   try {
     const result = await runAgentPipeline(lockedJob.payload);
+    const pipelineFailed = Boolean(result?.error);
     const { error: doneErr } = await supabaseAdmin
       .from("agent_jobs")
       .update({
-        status: "done",
+        status: pipelineFailed ? "failed" : "done",
         result,
         completed_at: new Date().toISOString(),
-        error_message: null,
+        error_message: pipelineFailed ? result.error : null,
       })
       .eq("id", lockedJob.id);
 
     if (doneErr) throw doneErr;
-    return { processed: true, jobId: lockedJob.id, status: "done" };
+    return {
+      processed: true,
+      jobId: lockedJob.id,
+      status: pipelineFailed ? "failed" : "done",
+      error: pipelineFailed ? result.error : undefined,
+    };
   } catch (error) {
     await supabaseAdmin
       .from("agent_jobs")

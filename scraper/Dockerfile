@@ -1,31 +1,30 @@
-# Use the full Python image for better library support
-FROM python:3.9
+FROM python:3.11-slim-bookworm
 
-# Install Chromium and Chromium Driver
-RUN apt-get update && apt-get install -y \
+# Chromium + driver from the same Debian release keeps versions aligned.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/* \
+    && chromium --version \
+    && chromedriver --version
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements from the scraper folder
 COPY scraper/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all files from the scraper folder
 COPY scraper/ .
 
-# Selenium / logging (stderr visible in Render logs immediately)
 ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROME_PATH=/usr/lib/chromium/
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV PYTHONUNBUFFERED=1
-# Niche scrape stops early so the HTTP response returns before upstream (e.g. Vercel) aborts
-ENV SCRAPE_BUDGET_SEC=2340
+# Finish before upstream worker/proxy limits; niche scrape is capped at 1 business.
+ENV SCRAPE_BUDGET_SEC=90
+ENV PAGE_LOAD_TIMEOUT_SEC=25
+ENV SCRIPT_TIMEOUT_SEC=20
 
-# Expose port
 EXPOSE 8000
 
-# Long requests: keep-alive helps slow Scrapes; tune on Render if needed
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "120"]
