@@ -11,6 +11,7 @@ from scraper_engine import (
     scrape_competitor_reviews,
     get_driver,
     probe_maps_search,
+    probe_place_reviews,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +66,20 @@ async def run_probe(request: ScrapeRequest):
         )
     except Exception as e:
         log.error("probe failed: %s\n%s", e, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/probe-reviews")
+async def run_probe_reviews(request: ScrapeRequest):
+    """Open first listing and sample review extraction."""
+    try:
+        return await asyncio.to_thread(
+            probe_place_reviews,
+            request.query,
+            request.location,
+        )
+    except Exception as e:
+        log.error("probe-reviews failed: %s\n%s", e, traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -152,6 +152,84 @@ def _listing_link_selectors():
     ]
 
 
+def safe_get(driver, url: str, wait_after: float = 1.0) -> bool:
+    """Navigate without failing the whole scrape on renderer timeouts."""
+    try:
+        driver.set_page_load_timeout(int(os.environ.get("PAGE_LOAD_TIMEOUT_SEC", "45")))
+        driver.get(url)
+        time.sleep(wait_after)
+        return True
+    except TimeoutException:
+        eprint("[scraper] page load timeout (continuing):", url[:140])
+        try:
+            driver.execute_script("window.stop();")
+        except Exception:
+            pass
+        time.sleep(wait_after)
+        return False
+
+
+def wait_for_place_panel(driver, timeout: float = 12.0) -> str:
+    try:
+        h1 = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "h1"))
+        )
+        return (h1.text or "").strip()
+    except TimeoutException:
+        return ""
+
+
+def open_place_by_index(driver, index: int) -> Optional[str]:
+    """Open a Maps listing by clicking the search-result card (SPA-friendly)."""
+    articles = driver.find_elements(By.CSS_SELECTOR, "div[role='article']")
+    if index >= len(articles):
+        return None
+
+    article = articles[index]
+    name = (article.get_attribute("aria-label") or "").strip()
+
+    for css in _listing_link_selectors():
+        try:
+            link_el = article.find_element(By.CSS_SELECTOR, css)
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", link_el)
+            time.sleep(0.35)
+            link_el.click()
+            time.sleep(1.6)
+            return name or wait_for_place_panel(driver) or None
+        except Exception:
+            continue
+    return None
+
+
+def load_search_results(driver, search_query: str, location: Optional[str]) -> bool:
+    url = _maps_search_url(search_query, location)
+    eprint("[scraper] niche maps URL:", url)
+    safe_get(driver, url, wait_after=1.0)
+    dismiss_cookie_consent(driver)
+
+    blocked = _page_block_reason(driver)
+    if blocked:
+        eprint("[scraper] maps blocked:", blocked, "url:", driver.current_url)
+        return False
+
+    if "/maps/place/" in driver.current_url:
+        return True
+
+    for css in ("div[role='feed']", "div[role='article']"):
+        try:
+            WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, css))
+            )
+            time.sleep(0.6)
+            return True
+        except TimeoutException:
+            continue
+
+    reason = _page_block_reason(driver) or "results_feed_timeout"
+    eprint("[scraper] timeout waiting for results feed/articles:", reason)
+    return False
+
+
 def _page_block_reason(driver) -> Optional[str]:
     try:
         src = (driver.page_source or "").lower()
@@ -314,6 +392,42 @@ def extract_review_blocks(driver, reviews_per_business: int, target_name: str, m
     return rows
 
 
+def probe_place_reviews(search_query: str, location: Optional[str] = None) -> Dict[str, Any]:
+    """Open first search result and report review DOM state."""
+    driver = get_driver()
+    try:
+        if not load_search_results(driver, search_query, location):
+            return {"ok": False, "stage": "search_load_failed"}
+
+        opened_via = "direct_place"
+        place_name = ""
+        if "/maps/place/" in driver.current_url:
+            place_name = wait_for_place_panel(driver)
+        else:
+            opened_via = "click_index_0"
+            clicked_name = open_place_by_index(driver, 0)
+            place_name = wait_for_place_panel(driver) or clicked_name or ""
+
+        reviews_tab_open = open_reviews_tab(driver, timeout=10.0)
+        block_counts = {}
+        for css in ("div.jftiEf", "div.jJc9Ad", "[data-review-id]", "span.wiI7pd"):
+            block_counts[css] = len(driver.find_elements(By.CSS_SELECTOR, css))
+
+        sample_rows = extract_review_blocks(driver, 3, place_name or "unknown", 1.0, 5.0)
+
+        return {
+            "ok": True,
+            "opened_via": opened_via,
+            "place_name": place_name,
+            "current_url": driver.current_url,
+            "reviews_tab_open": reviews_tab_open,
+            "block_counts": block_counts,
+            "sample_reviews": sample_rows,
+        }
+    finally:
+        driver.quit()
+
+
 def probe_maps_search(search_query: str, location: Optional[str] = None) -> Dict[str, Any]:
     """Lightweight probe for debugging empty scrapes (no review extraction)."""
     driver = get_driver()
@@ -354,83 +468,51 @@ def scrape_all_business_reviews(
     driver = get_driver()
     all_reviews_data: List[dict] = []
     deadline = _scrape_budget_deadline()
+    ms = float(min_stars)
+    xs = float(max_stars)
 
     try:
-        url = _maps_search_url(search_query, location)
-        eprint("[scraper] niche maps URL:", url)
-        driver.get(url)
-
-        dismiss_cookie_consent(driver)
-        time.sleep(1.0)
-
-        blocked = _page_block_reason(driver)
-        if blocked:
-            eprint("[scraper] maps blocked:", blocked, "url:", driver.current_url)
+        if not load_search_results(driver, search_query, location):
             return []
 
-        # Search sometimes redirects straight to a single place page.
         if "/maps/place/" in driver.current_url:
-            name = driver.current_url
-            try:
-                h1 = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
-                if h1:
-                    name = h1
-            except Exception:
-                pass
-            targets = [{"name": name, "link": driver.current_url}]
-            eprint("[scraper] direct place URL:", name)
-        else:
-            loaded = False
-            for css in ("div[role='feed']", "div[role='article']"):
-                if _over_budget(deadline):
-                    eprint("[scraper] budget hit while waiting for results")
-                    return filter_reviews(all_reviews_data)
-                try:
-                    WebDriverWait(driver, 15).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, css))
-                    )
-                    loaded = True
-                    break
-                except TimeoutException:
-                    continue
-            if not loaded:
-                reason = _page_block_reason(driver) or "results_feed_timeout"
-                eprint("[scraper] timeout waiting for results feed/articles:", reason)
-                return []
-
-            time.sleep(0.8)
-            targets = collect_place_targets(driver, max_businesses)
-            eprint("[scraper] targets collected:", len(targets), json.dumps([t["name"] for t in targets]))
-
-        if not targets:
-            eprint("[scraper] no listing URLs found (selectors/DOM mismatch or blocking)")
-            return []
-
-        ms = float(min_stars)
-        xs = float(max_stars)
-
-        for target in targets:
-            if _over_budget(deadline):
-                eprint("[scraper] budget exhausted — returning partial niche results")
-                break
-            try:
-                if driver.current_url != target["link"]:
-                    driver.get(target["link"])
-                    time.sleep(1.2)
-                if not open_reviews_tab(driver, timeout=8.0):
-                    eprint("[scraper] reviews tab not found for:", target["name"])
-                    continue
-                time.sleep(0.8)
-                rows = extract_review_blocks(
-                    driver, reviews_per_business, target["name"], ms, xs
-                )
-                eprint("[scraper] extracted rows for", target["name"], ":", len(rows))
+            place_name = wait_for_place_panel(driver) or "unknown"
+            if open_reviews_tab(driver, timeout=10.0):
+                rows = extract_review_blocks(driver, reviews_per_business, place_name, ms, xs)
+                eprint("[scraper] extracted rows for", place_name, ":", len(rows))
                 all_reviews_data.extend(rows)
-            except Exception as ex:
-                eprint("[scraper] business loop error:", target.get("name"), ex)
-                continue
+        else:
+            for index in range(max_businesses):
+                if _over_budget(deadline):
+                    eprint("[scraper] budget exhausted — returning partial niche results")
+                    break
 
-        out = filter_reviews(all_reviews_data)[:20]  # hard cap: at most 20 reviews per scrape job
+                if index > 0:
+                    if not load_search_results(driver, search_query, location):
+                        break
+                    scroll_results_feed(driver)
+
+                clicked_name = open_place_by_index(driver, index)
+                if not clicked_name:
+                    eprint("[scraper] could not open listing at index", index)
+                    break
+
+                place_name = wait_for_place_panel(driver) or clicked_name
+                try:
+                    if not open_reviews_tab(driver, timeout=10.0):
+                        eprint("[scraper] reviews tab not found for:", place_name)
+                        continue
+                    time.sleep(0.6)
+                    rows = extract_review_blocks(
+                        driver, reviews_per_business, place_name, ms, xs
+                    )
+                    eprint("[scraper] extracted rows for", place_name, ":", len(rows))
+                    all_reviews_data.extend(rows)
+                except Exception as ex:
+                    eprint("[scraper] business loop error:", place_name, ex)
+                    continue
+
+        out = filter_reviews(all_reviews_data)[:20]
         eprint("[scraper] niche complete, review count:", len(out))
         return out
     finally:
@@ -448,26 +530,17 @@ def scrape_competitor_reviews(
     deadline = _scrape_budget_deadline()
     try:
         search_query = f"{competitor_name} {location}".strip()
-        url = _maps_search_url(search_query, None)
-        eprint("[scraper] competitor maps URL:", url)
-        driver.get(url)
-        time.sleep(1.5)
-
-        dismiss_cookie_consent(driver)
+        if not load_search_results(driver, search_query, None):
+            return {"business_info": {"name": competitor_name, "website": "N/A", "phone": "N/A", "address": "N/A"}, "reviews": []}
 
         if "place/" not in driver.current_url:
             try:
                 if _over_budget(deadline):
                     return {"business_info": {"name": competitor_name, "website": "N/A", "phone": "N/A", "address": "N/A"}, "reviews": []}
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[role='feed'], div[role='article']"))
-                )
                 scroll_results_feed(driver, rounds=3)
-                link_el = WebDriverWait(driver, 8).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, "a.hfpxzc, a[href*='/maps/place/']"))
-                )
-                link_el.click()
-                time.sleep(1.8)
+                if not open_place_by_index(driver, 0):
+                    raise TimeoutException("no listing to click")
+                time.sleep(1.0)
             except Exception as ex:
                 eprint("[scraper] competitor first-result click failed:", ex)
 
