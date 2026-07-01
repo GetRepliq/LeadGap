@@ -1,11 +1,13 @@
-const PLACES_API_KEY =
-  process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 const PLACES_BASE = "https://places.googleapis.com/v1";
+
+function getPlacesApiKey() {
+  return process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+}
 
 function placesHeaders(fieldMask) {
   return {
     "Content-Type": "application/json",
-    "X-Goog-Api-Key": PLACES_API_KEY,
+    "X-Goog-Api-Key": getPlacesApiKey(),
     "X-Goog-FieldMask": fieldMask,
   };
 }
@@ -103,7 +105,7 @@ export async function fetchReviewsFromPlaces({
   competitorName,
   location,
 }) {
-  if (!PLACES_API_KEY) {
+  if (!getPlacesApiKey()) {
     return {
       error:
         "GOOGLE_PLACES_API_KEY is not set. Add it in Vercel → Settings → Environment Variables.",

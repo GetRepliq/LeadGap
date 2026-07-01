@@ -155,6 +155,11 @@ export async function runAgentPipeline({
       }
       break;
     }
+    case "error":
+      agentResponse = {
+        error: intentResult.detail || "Agent configuration error. Check your Gemini API key.",
+      };
+      break;
     case "other":
     default:
       agentResponse = { ...intentResult, message: "Hello! How can I help you today?" };
