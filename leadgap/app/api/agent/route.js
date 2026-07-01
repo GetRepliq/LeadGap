@@ -6,6 +6,7 @@ import {
 import { getCorsHeaders, withCorsJson } from "../../../lib/api-cors";
 
 import { encrypt } from '../../../lib/crypto';
+import { isValidGeminiKeyFormat, normalizeGeminiApiKey, validateGeminiApiKey } from '../../../lib/gemini-api-key';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
@@ -31,7 +32,21 @@ export async function POST(request) {
   // --- Action: Save/Encrypt API Key ---
   if (action === 'save_key' && userId && apiKey) {
     try {
-      const encryptedKey = encrypt(apiKey);
+      const normalizedKey = normalizeGeminiApiKey(apiKey);
+      if (!isValidGeminiKeyFormat(normalizedKey)) {
+        return withCorsJson(
+          request,
+          { error: "Invalid key format. Paste a Google AI Studio key that starts with AIza." },
+          400
+        );
+      }
+
+      const validation = await validateGeminiApiKey(normalizedKey);
+      if (!validation.valid) {
+        return withCorsJson(request, { error: validation.error }, 400);
+      }
+
+      const encryptedKey = encrypt(normalizedKey);
       const { error } = await supabaseAdmin
         .from('profiles')
         .update({ gemini_api_key: encryptedKey })

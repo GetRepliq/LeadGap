@@ -108,6 +108,7 @@ export default function AgentPage() {
   const [previousChats, setPreviousChats] = useState([]);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [userApiKey, setUserApiKey] = useState("");
+  const [keySaveError, setKeySaveError] = useState("");
 
   useEffect(() => {
     const getSessionAndChats = async () => {
@@ -142,14 +143,13 @@ export default function AgentPage() {
 
     if (!data?.gemini_api_key) {
       setShowKeyModal(true);
-    } else {
-      setUserApiKey(data.gemini_api_key);
     }
   };
 
   const handleSaveKey = async () => {
     if (!userApiKey.trim()) return;
     setLoading(true);
+    setKeySaveError("");
 
     try {
       const response = await fetch(buildApiUrl("/api/agent"), {
@@ -158,18 +158,19 @@ export default function AgentPage() {
         body: JSON.stringify({
           action: "save_key",
           userId: user.id,
-          apiKey: userApiKey,
+          apiKey: userApiKey.trim(),
         }),
       });
 
       const data = await parseJsonResponse(response, "Save key request");
       if (data.success) {
+        setUserApiKey("");
         setShowKeyModal(false);
       } else {
-        alert("Failed to secure key: " + data.error);
+        setKeySaveError(data.error || "Failed to save API key.");
       }
-    } catch {
-      alert("System error securing link.");
+    } catch (error) {
+      setKeySaveError(error.message || "System error securing link.");
     } finally {
       setLoading(false);
     }
@@ -683,10 +684,24 @@ export default function AgentPage() {
             <div className="space-y-2">
               <h2 className="text-xl text-white font-medium">Terminal Activation</h2>
               <p className="text-xs opacity-50 leading-relaxed">
-                To enable autonomous intelligence, provide your Gemini API key. This will be
-                stored securely in your private profile.
+                Use a key from{" "}
+                <a
+                  href="https://aistudio.google.com/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400/80 underline"
+                >
+                  Google AI Studio
+                </a>
+                . It is validated live before being encrypted and stored in your profile.
               </p>
             </div>
+
+            {keySaveError && (
+              <StatusBanner variant="error" title="Key Rejected">
+                {keySaveError}
+              </StatusBanner>
+            )}
 
             <div className="space-y-1">
               <label className="text-[10px] uppercase opacity-40 pl-2">

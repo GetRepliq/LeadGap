@@ -9,34 +9,12 @@ import {
   formatGeneratedContent,
   saveChat,
 } from "./agent-functions";
-import { decrypt } from "./crypto";
+import { getActiveApiKey } from "./gemini-auth";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_PRIVATE_SERVICE_ROLE
 );
-
-async function getActiveApiKey(userId) {
-  let activeApiKey = process.env.GEMINI_API_KEY;
-
-  if (!userId) return activeApiKey;
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("gemini_api_key")
-    .eq("id", userId)
-    .single();
-
-  if (profile?.gemini_api_key) {
-    try {
-      activeApiKey = decrypt(profile.gemini_api_key);
-    } catch (e) {
-      console.error("Failed to decrypt user API key, using fallback.");
-    }
-  }
-
-  return activeApiKey;
-}
 
 export async function classifyMessageIntent({ message, userId }) {
   const activeApiKey = await getActiveApiKey(userId);

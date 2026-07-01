@@ -3,76 +3,34 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchReviewsFromPlaces } from "./places-api";
 
 // --- Configuration ---
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_PRIVATE_SERVICE_ROLE;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// --- Regional Server Configuration ---
-const REGIONAL_BASE_URLS = {
-  "us-central1":     "https://us-central1-aiplatform.googleapis.com",
-  "us-east4":        "https://us-east4-aiplatform.googleapis.com",
-  "europe-west4":    "https://europe-west4-aiplatform.googleapis.com",
-  "asia-southeast1": "https://asia-southeast1-aiplatform.googleapis.com",
-};
-
-const ALL_REGIONS = [null, ...Object.keys(REGIONAL_BASE_URLS)];
-
-function shuffleArray(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-let activeRegion = process.env.GEMINI_REGION || null;
-const SHUFFLED_FALLBACKS = shuffleArray(ALL_REGIONS);
-
-function getRegionQueue() {
-  return [activeRegion, ...SHUFFLED_FALLBACKS.filter(r => r !== activeRegion)];
-}
-
-function buildGenAIForRegion(region, apiKey) {
-  if (region) {
-    const baseUrl = REGIONAL_BASE_URLS[region];
-    return new GoogleGenerativeAI(apiKey, { baseUrl });
-  }
-  return new GoogleGenerativeAI(apiKey);
-}
+const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 
 function is503(error) {
   return (
-    error?.message?.includes('503') ||
-    error?.message?.includes('Service Unavailable') ||
-    error?.message?.includes('high demand')
+    error?.message?.includes("503") ||
+    error?.message?.includes("Service Unavailable") ||
+    error?.message?.includes("high demand")
   );
 }
 
+/** Google AI Studio API keys must use the global Generative Language API — not Vertex regional URLs. */
 export async function withRegionFallback(apiFn, apiKey) {
-  const queue = getRegionQueue();
+  const genAI = new GoogleGenerativeAI(apiKey);
 
-  for (const region of queue) {
-    const regionLabel = region ?? 'global';
-    try {
-      const genAI = buildGenAIForRegion(region, apiKey);
-      const result = await apiFn(genAI);
-      if (activeRegion !== region) {
-        activeRegion = region;
-      }
-      return result;
-    } catch (error) {
-      if (is503(error)) {
-        await new Promise(res => setTimeout(res, 600));
-        continue;
-      }
-      throw error;
+  try {
+    return await apiFn(genAI);
+  } catch (error) {
+    if (is503(error)) {
+      await new Promise((res) => setTimeout(res, 800));
+      return await apiFn(genAI);
     }
+    throw error;
   }
-
-  throw new Error('All Gemini regions returned 503. Widespread issues detected.');
 }
 
 async function synthesizeMarketIntelligence(rawAnalysis, query, apiKey) {
@@ -81,7 +39,7 @@ async function synthesizeMarketIntelligence(rawAnalysis, query, apiKey) {
   try {
     const llmText = await withRegionFallback(async (genAI) => {
       const model = genAI.getGenerativeModel({
-        model: "models/gemini-flash-latest",
+        model: DEFAULT_GEMINI_MODEL,
         generationConfig: { responseMimeType: "application/json" },
       });
       const result = await model.generateContent(prompt);
@@ -101,7 +59,7 @@ export async function analyzeReviews(reviews, apiKey) {
   try {
     const llmText = await withRegionFallback(async (genAI) => {
       const model = genAI.getGenerativeModel({
-        model: "models/gemini-flash-latest",
+        model: DEFAULT_GEMINI_MODEL,
         generationConfig: { responseMimeType: "application/json" },
       });
       const result = await model.generateContent(prompt);
@@ -153,7 +111,7 @@ export async function classifyIntent(command, apiKey) {
   try {
     const llmText = await withRegionFallback(async (genAI) => {
       const model = genAI.getGenerativeModel({
-        model: "models/gemini-flash-latest",
+        model: DEFAULT_GEMINI_MODEL,
         generationConfig: { responseMimeType: "application/json" },
       });
       const result = await model.generateContent(prompt);
@@ -167,7 +125,15 @@ export async function classifyIntent(command, apiKey) {
     }
     return parsed;
   } catch (error) {
-    return { intent: "error", detail: error.message };
+    const message = error?.message || "Intent classification failed.";
+    if (message.includes("API_KEY_INVALID") || message.includes("API key not valid")) {
+      return {
+        intent: "error",
+        detail:
+          "Your Gemini API key was rejected by Google. Re-enter it via Terminal Activation (use a key from Google AI Studio, not Google Cloud/Vertex).",
+      };
+    }
+    return { intent: "error", detail: message };
   }
 }
 
@@ -179,7 +145,7 @@ export async function analyzeCompetitor(competitorData, apiKey) {
   try {
     const llmText = await withRegionFallback(async (genAI) => {
       const model = genAI.getGenerativeModel({
-        model: "models/gemini-flash-latest",
+        model: DEFAULT_GEMINI_MODEL,
         generationConfig: { responseMimeType: "application/json" },
       });
       const result = await model.generateContent(prompt);
@@ -202,7 +168,7 @@ export async function generateMarketingContent(request, apiKey) {
 
   try {
     const content = await withRegionFallback(async (genAI) => {
-      const model = genAI.getGenerativeModel({ model: "models/gemini-flash-latest" });
+      const model = genAI.getGenerativeModel({ model: DEFAULT_GEMINI_MODEL });
       const result = await model.generateContent(prompt);
       return result.response.text();
     }, apiKey);

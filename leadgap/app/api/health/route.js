@@ -7,6 +7,7 @@ export async function GET(request) {
     reviews: "google-places-api-v1",
     config: {
       gemini: Boolean(process.env.GEMINI_API_KEY),
+      encryption: Boolean(process.env.ENCRYPTION_SECRET),
       googlePlaces: Boolean(
         process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY
       ),
