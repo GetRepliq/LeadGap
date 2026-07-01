@@ -91,11 +91,10 @@ export async function runAgentPipeline({
       });
 
       if (scrapedNicheReviews.error) {
-        agentResponse = { error: `Scraping error: ${scrapedNicheReviews.error}` };
+        agentResponse = { error: `Review fetch error: ${scrapedNicheReviews.error}` };
       } else if (!Array.isArray(scrapedNicheReviews) || scrapedNicheReviews.length === 0) {
         agentResponse = {
-          error:
-            "Scraper returned no reviews. Google Maps may be blocking the server IP or the page layout changed.",
+          error: "No reviews returned from Google Places API for this search.",
         };
       } else {
         agentResponse = await analyzeReviews(scrapedNicheReviews, activeApiKey);
@@ -127,7 +126,12 @@ export async function runAgentPipeline({
       });
 
       if (scrapedCompetitorData.error) {
-        agentResponse = { error: `Scraping error: ${scrapedCompetitorData.error}` };
+        agentResponse = { error: `Review fetch error: ${scrapedCompetitorData.error}` };
+      } else if (
+        !scrapedCompetitorData.reviews?.length &&
+        !Array.isArray(scrapedCompetitorData)
+      ) {
+        agentResponse = { error: "No competitor reviews returned from Google Places API." };
       } else {
         agentResponse = await analyzeCompetitor(scrapedCompetitorData, activeApiKey);
       }
