@@ -169,14 +169,32 @@ def safe_get(driver, url: str, wait_after: float = 1.0) -> bool:
         return False
 
 
-def wait_for_place_panel(driver, timeout: float = 12.0) -> str:
-    try:
-        h1 = WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "h1"))
-        )
-        return (h1.text or "").strip()
-    except TimeoutException:
+def place_name_from_url(url: str) -> str:
+    import re
+    from urllib.parse import unquote
+
+    match = re.search(r"/place/([^/@?]+)", url)
+    if not match:
         return ""
+    return unquote(match.group(1).replace("+", " ")).strip()
+
+
+def wait_for_place_panel(driver, timeout: float = 12.0) -> str:
+    deadline = time.monotonic() + timeout
+    invalid_names = {"results", "google maps", ""}
+
+    while time.monotonic() < deadline:
+        for css in ("h1.DUwDvf", "h1.fontHeadlineLarge", "h1"):
+            try:
+                for h1 in driver.find_elements(By.CSS_SELECTOR, css):
+                    text = (h1.text or "").strip()
+                    if text.lower() not in invalid_names:
+                        return text
+            except Exception:
+                continue
+        time.sleep(0.4)
+
+    return place_name_from_url(driver.current_url)
 
 
 def open_place_by_index(driver, index: int) -> Optional[str]:
@@ -194,7 +212,7 @@ def open_place_by_index(driver, index: int) -> Optional[str]:
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", link_el)
             time.sleep(0.35)
             link_el.click()
-            time.sleep(1.6)
+            time.sleep(2.0)
             return name or wait_for_place_panel(driver) or None
         except Exception:
             continue
@@ -256,10 +274,11 @@ def _parse_star_value(star_aria: str) -> Optional[float]:
     return None
 
 
-def scroll_reviews_panel(driver, rounds: int = 5) -> None:
+def scroll_reviews_panel(driver, rounds: int = 6) -> None:
     selectors = (
         "div[role='main'] div.m6QErb.DxyBCb",
         "div[role='main'] div.m6QErb",
+        "div[role='main'] div[tabindex='-1']",
         "div[role='main']",
     )
     for css in selectors:
@@ -270,10 +289,114 @@ def scroll_reviews_panel(driver, rounds: int = 5) -> None:
                     "arguments[0].scrollTop = arguments[0].scrollHeight",
                     panel,
                 )
-                time.sleep(0.35)
+                time.sleep(0.45)
             return
         except Exception:
             continue
+
+
+REVIEW_BLOCK_SELECTORS = (
+    "div.jftiEf",
+    "div.jJc9Ad",
+    "div.g88MCb",
+    "div.UfnAi",
+    "[data-review-id]",
+)
+
+
+def wait_for_review_elements(driver, timeout: float = 18.0) -> bool:
+    def _any_reviews_present(drv) -> bool:
+        for css in REVIEW_BLOCK_SELECTORS + ("span.wiI7pd", "div.wiI7pd", "div.MyEned"):
+            if drv.find_elements(By.CSS_SELECTOR, css):
+                return True
+        return False
+
+    try:
+        WebDriverWait(driver, timeout).until(_any_reviews_present)
+        return True
+    except TimeoutException:
+        return False
+
+
+def expand_reviews_list(driver) -> bool:
+    xpaths = (
+        "//button[contains(., 'More reviews')]",
+        "//span[contains(., 'More reviews')]",
+        "//button[contains(@aria-label, 'More reviews')]",
+        "//a[contains(@href, 'reviews')]",
+    )
+    for xpath in xpaths:
+        try:
+            btn = WebDriverWait(driver, 2).until(
+                EC.element_to_be_clickable((By.XPATH, xpath))
+            )
+            btn.click()
+            time.sleep(1.5)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def extract_reviews_js(driver, limit: int, business_name: str) -> List[dict]:
+    script = """
+    const limit = arguments[0];
+    const businessName = arguments[1] || 'unknown';
+    const seen = new Set();
+    const out = [];
+
+    const cardSelectors = [
+      'div[data-review-id]',
+      'div.jftiEf',
+      'div.jJc9Ad',
+      'div.g88MCb',
+      'div.UfnAi',
+    ];
+    const textSelectors = [
+      'span.wiI7pd',
+      'div.wiI7pd',
+      'div.MyEned span',
+      'div.MyEned',
+    ];
+
+    function addRow(text, stars) {
+      const t = (text || '').replace(/\\s+/g, ' ').trim();
+      if (t.length < 12 || seen.has(t)) return;
+      seen.add(t);
+      out.push({ business_name: businessName, stars: stars || 'unknown', text: t });
+    }
+
+    for (const cardSel of cardSelectors) {
+      for (const card of document.querySelectorAll(cardSel)) {
+        if (out.length >= limit) return out;
+        let text = '';
+        for (const ts of textSelectors) {
+          const el = card.querySelector(ts);
+          if (el && el.innerText) { text = el.innerText; break; }
+        }
+        if (!text) continue;
+        let stars = 'unknown';
+        const starEl = card.querySelector('[aria-label*="star" i], [aria-label*="Star"]');
+        if (starEl) stars = starEl.getAttribute('aria-label') || stars;
+        addRow(text, stars);
+      }
+    }
+
+    const main = document.querySelector('div[role="main"]');
+    if (main && out.length < limit) {
+      for (const el of main.querySelectorAll('span.wiI7pd, div.wiI7pd, div.MyEned')) {
+        addRow(el.innerText, 'unknown');
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+    """
+    try:
+        raw = driver.execute_script(script, limit, business_name)
+        return raw if isinstance(raw, list) else []
+    except Exception as ex:
+        eprint("[scraper] JS review extraction failed:", ex)
+        return []
 
 
 def collect_place_targets(driver, max_businesses: int) -> List[Dict[str, str]]:
@@ -320,11 +443,11 @@ def collect_place_targets(driver, max_businesses: int) -> List[Dict[str, str]]:
     return targets[:max_businesses]
 
 
-def open_reviews_tab(driver, timeout: float = 8.0) -> bool:
+def open_reviews_tab(driver, timeout: float = 10.0) -> bool:
     xpath = (
-        "//button[@role='tab'][contains(., 'Reviews')] | "
-        "//div[@role='tab'][contains(., 'Reviews')] | "
-        "//button[contains(@aria-label, 'Reviews')] | "
+        "//button[@role='tab' and contains(@aria-label, 'Reviews')] | "
+        "//button[@role='tab' and contains(., 'Reviews')] | "
+        "//div[@role='tab' and contains(., 'Reviews')] | "
         "//button[contains(@aria-label, 'reviews')]"
     )
     try:
@@ -332,17 +455,28 @@ def open_reviews_tab(driver, timeout: float = 8.0) -> bool:
             EC.element_to_be_clickable((By.XPATH, xpath))
         )
         tab.click()
-        time.sleep(1.0)
+        time.sleep(1.5)
+        expand_reviews_list(driver)
+        wait_for_review_elements(driver, timeout=12.0)
         scroll_reviews_panel(driver)
+        time.sleep(0.8)
         return True
     except Exception:
         return False
 
 
+def extract_overview_reviews(driver, limit: int, business_name: str) -> List[dict]:
+    """Some listings show review snippets on the Overview tab before Reviews is opened."""
+    rows = extract_reviews_js(driver, limit, business_name)
+    if rows:
+        eprint("[scraper] overview/js preview reviews:", len(rows))
+    return rows
+
+
 def extract_review_blocks(driver, reviews_per_business: int, target_name: str, min_stars: float, max_stars: float) -> List[dict]:
     rows: List[dict] = []
     review_elements: List[Any] = []
-    for css in ("div.jftiEf", "div.jJc9Ad", "[data-review-id]"):
+    for css in REVIEW_BLOCK_SELECTORS:
         review_elements = driver.find_elements(By.CSS_SELECTOR, css)
         if review_elements:
             eprint(f"[scraper] review blocks via {css}: {len(review_elements)}")
@@ -389,7 +523,18 @@ def extract_review_blocks(driver, reviews_per_business: int, target_name: str, m
                 rows.append({"business_name": target_name, "stars": star_aria, "text": text})
         except Exception:
             continue
-    return rows
+
+    if not rows:
+        js_rows = extract_reviews_js(driver, reviews_per_business, target_name)
+        eprint("[scraper] JS fallback reviews:", len(js_rows))
+        for item in js_rows:
+            stars = _parse_star_value(str(item.get("stars", "")))
+            if stars is None or (min_stars <= stars <= max_stars):
+                rows.append(item)
+            if len(rows) >= reviews_per_business:
+                break
+
+    return rows[:reviews_per_business]
 
 
 def probe_place_reviews(search_query: str, location: Optional[str] = None) -> Dict[str, Any]:
@@ -408,12 +553,34 @@ def probe_place_reviews(search_query: str, location: Optional[str] = None) -> Di
             clicked_name = open_place_by_index(driver, 0)
             place_name = wait_for_place_panel(driver) or clicked_name or ""
 
-        reviews_tab_open = open_reviews_tab(driver, timeout=10.0)
+        overview_rows = extract_overview_reviews(driver, 3, place_name or "unknown")
+        reviews_tab_open = open_reviews_tab(driver, timeout=12.0)
+        reviews_loaded = wait_for_review_elements(driver, timeout=8.0)
+
         block_counts = {}
-        for css in ("div.jftiEf", "div.jJc9Ad", "[data-review-id]", "span.wiI7pd"):
+        for css in REVIEW_BLOCK_SELECTORS + ("span.wiI7pd", "div.wiI7pd", "div.MyEned", "div.g88MCb"):
             block_counts[css] = len(driver.find_elements(By.CSS_SELECTOR, css))
 
         sample_rows = extract_review_blocks(driver, 3, place_name or "unknown", 1.0, 5.0)
+        if not sample_rows and overview_rows:
+            sample_rows = overview_rows
+
+        text_hit_count = 0
+        try:
+            text_hit_count = driver.execute_script(
+                """
+                const main = document.querySelector('div[role="main"]');
+                if (!main) return 0;
+                let n = 0;
+                for (const el of main.querySelectorAll('span, div')) {
+                  const t = (el.innerText || '').trim();
+                  if (t.length >= 30 && t.length <= 1500) n++;
+                }
+                return n;
+                """
+            ) or 0
+        except Exception:
+            text_hit_count = 0
 
         return {
             "ok": True,
@@ -421,8 +588,11 @@ def probe_place_reviews(search_query: str, location: Optional[str] = None) -> Di
             "place_name": place_name,
             "current_url": driver.current_url,
             "reviews_tab_open": reviews_tab_open,
+            "reviews_loaded": reviews_loaded,
             "block_counts": block_counts,
+            "overview_reviews": overview_rows,
             "sample_reviews": sample_rows,
+            "text_hit_count": text_hit_count,
         }
     finally:
         driver.quit()
@@ -477,7 +647,10 @@ def scrape_all_business_reviews(
 
         if "/maps/place/" in driver.current_url:
             place_name = wait_for_place_panel(driver) or "unknown"
-            if open_reviews_tab(driver, timeout=10.0):
+            overview_rows = extract_overview_reviews(driver, reviews_per_business, place_name)
+            if overview_rows:
+                all_reviews_data.extend(overview_rows)
+            if len(overview_rows) < reviews_per_business and open_reviews_tab(driver, timeout=12.0):
                 rows = extract_review_blocks(driver, reviews_per_business, place_name, ms, xs)
                 eprint("[scraper] extracted rows for", place_name, ":", len(rows))
                 all_reviews_data.extend(rows)
@@ -499,7 +672,14 @@ def scrape_all_business_reviews(
 
                 place_name = wait_for_place_panel(driver) or clicked_name
                 try:
-                    if not open_reviews_tab(driver, timeout=10.0):
+                    overview_rows = extract_overview_reviews(driver, reviews_per_business, place_name)
+                    if overview_rows:
+                        all_reviews_data.extend(overview_rows)
+                        eprint("[scraper] overview reviews for", place_name, ":", len(overview_rows))
+                    if len(overview_rows) >= reviews_per_business:
+                        continue
+
+                    if not open_reviews_tab(driver, timeout=12.0):
                         eprint("[scraper] reviews tab not found for:", place_name)
                         continue
                     time.sleep(0.6)
